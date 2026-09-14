@@ -370,7 +370,7 @@ export default function CircuitBuilderPage() {
     setPendingControl(null)
   }
 
-  const handlegit status = async () => {
+  const handleSimulate = async () => {
     setSimulating(true)
     setSimError(null)
     const circuitGates = toCircuitGates(gates)
