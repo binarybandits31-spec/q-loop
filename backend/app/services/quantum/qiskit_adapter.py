@@ -198,9 +198,11 @@ class QiskitAerBackend(QuantumBackend):
                         clbit += 1
 
             # choose simulator
-            if include_statevector and not any(
+            has_measurements = any(
                 op.get("gate", "").upper() in MEASURE_GATES for op in ops
-            ):
+            )
+
+            if include_statevector and not has_measurements:
                 sim = AerSimulator(method="statevector")
                 qc.save_statevector()
             else:
@@ -208,12 +210,32 @@ class QiskitAerBackend(QuantumBackend):
 
             job = sim.run(qc, shots=shots)
             result = job.result()
-            counts: Dict[str, int] = dict(result.get_counts())
 
-            # normalise bitstring keys (Qiskit puts space between registers)
-            counts = {k.replace(" ", ""): v for k, v in counts.items()}
+            counts: Dict[str, int] = {}
+            probabilities: Dict[str, float] = {}
 
-            probabilities = self.get_probabilities(counts, shots)
+            if include_statevector and not has_measurements:
+                # Statevector mode has probabilities, not measurement counts.
+                sv = result.get_statevector()
+
+                probabilities = {
+                    str(i): float(abs(amp) ** 2)
+                    for i, amp in enumerate(sv)
+                    if abs(amp) > 1e-12
+                }
+            else:
+                counts = dict(result.get_counts())
+
+                # Normalise bitstring keys.
+                counts = {
+                    k.replace(" ", ""): int(v)
+                    for k, v in counts.items()
+                }
+
+                probabilities = self.get_probabilities(
+                    counts,
+                    shots,
+                )
 
             statevector_data = None
             if include_statevector:
@@ -224,7 +246,11 @@ class QiskitAerBackend(QuantumBackend):
                     pass
 
             depth = qc.depth()
-            gate_count = sum(1 for inst in qc.data if inst.operation.name not in ("measure", "barrier"))
+            gate_count = sum(
+    1
+    for inst in qc.data
+    if inst.operation.name not in ("measure", "barrier", "save_statevector")
+)
             elapsed_ms = (time.perf_counter() - t0) * 1000
 
             return ExecutionResult(

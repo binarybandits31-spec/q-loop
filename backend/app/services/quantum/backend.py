@@ -59,11 +59,26 @@ class QuantumBackend(ABC):
 def get_backend(framework: str) -> QuantumBackend:
     """Factory: return the appropriate backend for the requested framework."""
     from .qiskit_adapter import QiskitAerBackend
+    from .pennylane_adapter import PennyLaneBackend
 
     backends: Dict[str, QuantumBackend] = {
         "qiskit_aer": QiskitAerBackend(),
+        "pennylane": PennyLaneBackend(),
     }
 
+    # Cirq adapter is architecturally planned but not yet operational.
+    backend = backends.get(framework)
+    if backend is None:
+        raise ValueError(
+            f"Backend '{framework}' is not available. "
+            f"Available: {list(backends.keys())}"
+        )
+    if not backend.is_available:
+        raise RuntimeError(
+            f"Backend '{framework}' is installed but not operational. "
+            "Check that all required packages are installed."
+        )
+    return backend
     # PennyLane and Cirq adapters are architecturally planned but not yet operational.
     backend = backends.get(framework)
     if backend is None:

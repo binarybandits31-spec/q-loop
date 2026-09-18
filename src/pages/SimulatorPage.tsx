@@ -295,7 +295,7 @@ export default function SimulatorPage() {
           shots,
         });
 
-        if (!res.success || res.error) {
+        if (res.status !== 'success' || res.error) {
           setBackendError(res.error || 'Execution failed');
           // Fall back to local simulation
           const sim = simulateCircuit(parsed.gates, parsed.numQubits, shots);

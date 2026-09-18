@@ -8,28 +8,45 @@ export interface ExecuteRequest {
 }
 
 export interface ExecuteResponse {
-  success: boolean
+  status: string
+  framework: string
+  shots: number
   counts: Record<string, number>
   probabilities: Record<string, number>
-  num_qubits: number
-  shots: number
-  simulator: string
+  statevector: [number, number][] | null
+  execution_time_ms: number
+  circuit_depth: number | null
+  gate_count: number
   error: string | null
 }
 
 export async function executeCircuit(req: ExecuteRequest): Promise<ExecuteResponse> {
-  const res = await fetch(`${API_URL}/api/execute`, {
+  const res = await fetch(`${API_URL}/api/simulator/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
   })
+
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`Backend returned ${res.status}: ${text || res.statusText}`)
   }
-  return res.json()
-}
 
+  const data = await res.json()
+
+  return {
+  status: data.status,
+  framework: data.framework,
+  shots: data.shots ?? req.shots ?? 1024,
+  counts: data.counts ?? {},
+  probabilities: data.probabilities ?? {},
+  statevector: data.statevector ?? null,
+  execution_time_ms: data.execution_time_ms ?? 0,
+  circuit_depth: data.circuit_depth ?? null,
+  gate_count: data.gate_count ?? 0,
+  error: data.error ?? null,
+}
+}
 export async function checkHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${API_URL}/api/health`)

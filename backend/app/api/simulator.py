@@ -49,7 +49,7 @@ async def simulator_run(
         status=result.status,
         framework=result.framework,
         shots=result.shots,
-        counts=result.counts,
+        counts=result.counts if result.counts else {},
         probabilities=result.probabilities,
         statevector=result.statevector,
         execution_time_ms=result.execution_time_ms,
@@ -80,8 +80,8 @@ async def list_backends():
         {
             "id": "pennylane",
             "name": "PennyLane",
-            "description": "Differentiable quantum computing (planned integration).",
-            "is_operational": False,
+            "description": "Differentiable quantum computing simulator.",
+            "is_operational": True,
             "is_default": False,
         },
         {
