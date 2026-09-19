@@ -258,6 +258,7 @@ export default function SimulatorPage() {
   const [code, setCode] = useState<string>(EXAMPLES['Bell State']);
   const [shots, setShots] = useState<number>(1024);
   const [result, setResult] = useState<SimulationResult | null>(null);
+  const [framework, setFramework] = useState<'qiskit_aer' | 'pennylane' | 'cirq'>('qiskit_aer');
   const [parseError, setParseError] = useState<string | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [circuitName, setCircuitName] = useState<string>('Bell');
@@ -293,27 +294,54 @@ export default function SimulatorPage() {
           classical_bits: parsed.numQubits,
           operations,
           shots,
-        });
+          framework,
+  });
 
         if (res.status !== 'success' || res.error) {
           setBackendError(res.error || 'Execution failed');
           // Fall back to local simulation
           const sim = simulateCircuit(parsed.gates, parsed.numQubits, shots);
+          const backendStateVector = res.statevector
+  ? {
+      amplitudes: res.statevector.map(([re, im]) => ({ re, im })),
+      numQubits: parsed.numQubits,
+    }
+  : null;
           setResult(sim);
         } else {
           // Map backend response to frontend SimulationResult shape
           const local = simulateCircuit(parsed.gates, parsed.numQubits, 0);
-          const histogram = Object.entries(res.counts)
-            .map(([state, count]) => ({ state, count, probability: res.probabilities[state] ?? count / res.shots }))
-            .sort((a, b) => b.count - a.count);
-          setResult({
-            stateVector: local.stateVector,
-            probabilities: local.probabilities,
-            measurements: [{ outcome: '', probability: 1, counts: res.counts }],
-            measuredQubits: new Set<number>(),
-            histogram,
-          });
-        }
+
+          const backendStateVector = res.statevector
+    ? {
+        amplitudes: res.statevector.map(([re, im]) => ({ re, im })),
+        numQubits: parsed.numQubits,
+      }
+    : null;
+
+  const histogram = Object.entries(res.counts)
+    .map(([state, count]) => ({
+      state,
+      count,
+      probability:
+        res.probabilities[state] ?? count / res.shots,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  setResult({
+    stateVector: backendStateVector ?? local.stateVector,
+    probabilities: local.probabilities,
+    measurements: [
+      {
+        outcome: '',
+        probability: 1,
+        counts: res.counts,
+      },
+    ],
+    measuredQubits: new Set<number>(),
+    histogram,
+  });
+}
       } catch (err) {
         setBackendError(err instanceof Error ? err.message : 'Failed to connect to backend');
         // Fall back to local simulation
@@ -326,7 +354,7 @@ export default function SimulatorPage() {
     } finally {
       setIsRunning(false);
     }
-  }, [code, shots]);
+  }, [code, shots, framework]);
 
   const handleExample = useCallback((key: string) => {
     setCode(EXAMPLES[key]);

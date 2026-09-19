@@ -2,6 +2,7 @@
 
 All adapters (QiskitAer, PennyLane, Cirq, qBraid) must implement this interface.
 """
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -28,19 +29,29 @@ class QuantumBackend(ABC):
     @abstractmethod
     def name(self) -> str:
         """Human-readable backend name."""
+        ...
 
     @property
     @abstractmethod
     def is_available(self) -> bool:
         """Whether this backend is currently operational."""
+        ...
 
     @abstractmethod
     def validate(self, circuit_data: dict) -> List[dict]:
         """
         Validate a circuit JSON.
+
         Returns a list of findings dicts:
-          { severity, type, message, suggestion, gate_indices }
+          {
+              severity,
+              type,
+              message,
+              suggestion,
+              gate_indices
+          }
         """
+        ...
 
     @abstractmethod
     def execute(
@@ -50,45 +61,45 @@ class QuantumBackend(ABC):
         include_statevector: bool = False,
     ) -> ExecutionResult:
         """Execute a circuit and return measurement results."""
+        ...
 
-    def get_probabilities(self, counts: Dict[str, int], shots: int) -> Dict[str, float]:
+    def get_probabilities(
+        self,
+        counts: Dict[str, int],
+        shots: int,
+    ) -> Dict[str, float]:
         """Convert measurement counts to probabilities."""
-        return {state: count / shots for state, count in counts.items()}
+        return {
+            state: count / shots
+            for state, count in counts.items()
+        }
 
 
 def get_backend(framework: str) -> QuantumBackend:
     """Factory: return the appropriate backend for the requested framework."""
+
     from .qiskit_adapter import QiskitAerBackend
     from .pennylane_adapter import PennyLaneBackend
+    from .cirq_adapter import CirqBackend
 
     backends: Dict[str, QuantumBackend] = {
         "qiskit_aer": QiskitAerBackend(),
         "pennylane": PennyLaneBackend(),
+        "cirq": CirqBackend(),
     }
 
-    # Cirq adapter is architecturally planned but not yet operational.
     backend = backends.get(framework)
+
     if backend is None:
         raise ValueError(
             f"Backend '{framework}' is not available. "
             f"Available: {list(backends.keys())}"
         )
+
     if not backend.is_available:
         raise RuntimeError(
             f"Backend '{framework}' is installed but not operational. "
             "Check that all required packages are installed."
         )
-    return backend
-    # PennyLane and Cirq adapters are architecturally planned but not yet operational.
-    backend = backends.get(framework)
-    if backend is None:
-        raise ValueError(
-            f"Backend '{framework}' is not available. "
-            f"Available: {list(backends.keys())}"
-        )
-    if not backend.is_available:
-        raise RuntimeError(
-            f"Backend '{framework}' is installed but not operational. "
-            "Check that all required packages are installed."
-        )
+
     return backend

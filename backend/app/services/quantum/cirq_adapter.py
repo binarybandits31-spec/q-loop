@@ -1,7 +1,7 @@
-"""Qiskit Aer quantum execution backend.
+"""Cirq quantum execution backend.
 
-Translates the Q-loop circuit JSON into a Qiskit QuantumCircuit,
-executes it using Aer's AerSimulator, and returns structured results.
+Translates Q-Loop circuit JSON into a Cirq Circuit,
+executes it using Cirq's Simulator, and returns structured results.
 """
 
 import math
@@ -12,20 +12,18 @@ from .backend import QuantumBackend, ExecutionResult
 
 
 PARAMETRIC_GATES = {"RX", "RY", "RZ", "P", "U"}
-TWO_QUBIT_GATES = {"CX", "CNOT", "CZ", "CY", "CH", "SWAP"}
-THREE_QUBIT_GATES = {"TOFFOLI", "CCX"}
 MEASURE_GATES = {"M", "MEASURE"}
 
 
-class QiskitAerBackend(QuantumBackend):
+class CirqBackend(QuantumBackend):
     @property
     def name(self) -> str:
-        return "Qiskit Aer"
+        return "Cirq"
 
     @property
     def is_available(self) -> bool:
         try:
-            from qiskit_aer import AerSimulator
+            import cirq
             return True
         except ImportError:
             return False
@@ -71,7 +69,7 @@ class QiskitAerBackend(QuantumBackend):
                     "type": "invalid_control",
                     "message": (
                         f"Operation {i + 1} ({gate}): "
-                        f"control qubit {control} is out of range."
+                        f"control qubit {control} is out of range [0,{n - 1}]."
                     ),
                     "suggestion": f"Use a control in [0,{n - 1}].",
                     "gate_indices": [i],
@@ -83,7 +81,7 @@ class QiskitAerBackend(QuantumBackend):
                     "type": "invalid_control2",
                     "message": (
                         f"Operation {i + 1} ({gate}): "
-                        f"second control {control2} is out of range."
+                        f"second control {control2} is out of range [0,{n - 1}]."
                     ),
                     "suggestion": f"Use a control2 in [0,{n - 1}].",
                     "gate_indices": [i],
@@ -102,6 +100,38 @@ class QiskitAerBackend(QuantumBackend):
                         f"control and target are the same qubit ({control})."
                     ),
                     "suggestion": "Use different qubits for control and target.",
+                    "gate_indices": [i],
+                })
+
+            if (
+                control2 is not None
+                and target is not None
+                and control2 == target
+            ):
+                findings.append({
+                    "severity": "error",
+                    "type": "control2_equals_target",
+                    "message": (
+                        f"Operation {i + 1} ({gate}): "
+                        f"second control and target are the same qubit ({target})."
+                    ),
+                    "suggestion": "Use different qubits for control2 and target.",
+                    "gate_indices": [i],
+                })
+
+            if (
+                control is not None
+                and control2 is not None
+                and control == control2
+            ):
+                findings.append({
+                    "severity": "error",
+                    "type": "controls_equal",
+                    "message": (
+                        f"Operation {i + 1} ({gate}): "
+                        f"both control qubits are the same ({control})."
+                    ),
+                    "suggestion": "Use different control qubits.",
                     "gate_indices": [i],
                 })
 
@@ -130,37 +160,10 @@ class QiskitAerBackend(QuantumBackend):
                     "type": "missing_parameter",
                     "message": (
                         f"Operation {i + 1} ({gate}): "
-                        "rotation gate has no parameter. Defaulting to π/2."
+                        "rotation gate has no parameter. Defaulting to pi/2."
                     ),
                     "suggestion": "Provide an explicit parameter value.",
                     "gate_indices": [i],
-                })
-
-        for i in range(len(ops) - 1):
-            g1 = ops[i]
-            g2 = ops[i + 1]
-
-            if (
-                g1.get("gate", "").upper()
-                == g2.get("gate", "").upper()
-                and g1.get("target") == g2.get("target")
-                and g1.get("gate", "").upper()
-                in {"X", "Y", "Z", "H", "CZ", "SWAP"}
-            ):
-                findings.append({
-                    "severity": "optimization",
-                    "type": "redundant_pair",
-                    "message": (
-                        f"Operations {i + 1}–{i + 2}: "
-                        f"two consecutive {g1['gate'].upper()} gates "
-                        f"on qubit {g1['target']} cancel each other "
-                        "(= Identity)."
-                    ),
-                    "suggestion": (
-                        f"Remove both {g1['gate'].upper()} gates "
-                        "to simplify the circuit."
-                    ),
-                    "gate_indices": [i, i + 1],
                 })
 
         if (
@@ -174,7 +177,7 @@ class QiskitAerBackend(QuantumBackend):
                 "severity": "warning",
                 "type": "no_measurement",
                 "message": (
-                    "Circuit has no measurement gates — "
+                    "Circuit has no measurement gates - "
                     "classical output will be empty."
                 ),
                 "suggestion": (
@@ -192,14 +195,13 @@ class QiskitAerBackend(QuantumBackend):
     ) -> ExecutionResult:
 
         try:
-            from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-            from qiskit_aer import AerSimulator
+            import cirq
         except ImportError as e:
             return ExecutionResult(
                 status="error",
                 framework=self.name,
                 shots=shots,
-                error=f"Qiskit Aer is not installed: {e}",
+                error=f"Cirq is not installed: {e}",
             )
 
         t0 = time.perf_counter()
@@ -208,41 +210,11 @@ class QiskitAerBackend(QuantumBackend):
             n = circuit_data["qubits"]
             ops = circuit_data.get("operations", [])
 
-            # Count measurement operations.
-            measurement_ops = [
-                op
-                for op in ops
-                if op.get("gate", "").upper() in MEASURE_GATES
-            ]
+            qubits = cirq.LineQubit.range(n)
+            circuit = cirq.Circuit()
 
-            # We need at least one classical bit for every measurement.
-            requested_classical_bits = circuit_data.get(
-                "classical_bits",
-                0,
-            )
+            measurement_targets = []
 
-            cb = max(
-                n if measurement_ops else 0,
-                requested_classical_bits,
-                len(measurement_ops),
-            )
-
-            # -----------------------------------------
-            # Create quantum/classical registers
-            # -----------------------------------------
-            qr = QuantumRegister(n, "q")
-
-            if cb > 0:
-                cr = ClassicalRegister(cb, "c")
-                qc = QuantumCircuit(qr, cr)
-            else:
-                qc = QuantumCircuit(qr)
-
-            clbit = 0
-
-            # -----------------------------------------
-            # Translate Q-loop operations to Qiskit
-            # -----------------------------------------
             for op in ops:
                 gate = op.get("gate", "").upper()
                 tgt = op.get("target", 0)
@@ -250,160 +222,158 @@ class QiskitAerBackend(QuantumBackend):
                 ctrl2 = op.get("control2")
                 param = op.get("parameter", math.pi / 2)
 
+                q = qubits[tgt]
+
                 if gate == "H":
-                    qc.h(tgt)
+                    circuit.append(cirq.H(q))
 
                 elif gate == "X":
-                    qc.x(tgt)
+                    circuit.append(cirq.X(q))
 
                 elif gate == "Y":
-                    qc.y(tgt)
+                    circuit.append(cirq.Y(q))
 
                 elif gate == "Z":
-                    qc.z(tgt)
+                    circuit.append(cirq.Z(q))
 
                 elif gate == "S":
-                    qc.s(tgt)
+                    circuit.append(cirq.S(q))
+
+                elif gate == "SDG":
+                    circuit.append(cirq.S(q) ** -1)
+
+                elif gate in ("SDAGGER",):
+                    circuit.append(cirq.S(q) ** -1)
 
                 elif gate == "T":
-                    qc.t(tgt)
+                    circuit.append(cirq.T(q))
 
-                elif gate in ("SDG", "SDAGGER"):
-                    qc.sdg(tgt)
+                elif gate == "TDG":
+                    circuit.append(cirq.T(q) ** -1)
 
-                elif gate in ("TDG", "TDAGGER"):
-                    qc.tdg(tgt)
+                elif gate in ("TDAGGER",):
+                    circuit.append(cirq.T(q) ** -1)
 
                 elif gate == "RX":
-                    qc.rx(param, tgt)
+                    circuit.append(cirq.rx(param)(q))
 
                 elif gate == "RY":
-                    qc.ry(param, tgt)
+                    circuit.append(cirq.ry(param)(q))
 
                 elif gate == "RZ":
-                    qc.rz(param, tgt)
+                    circuit.append(cirq.rz(param)(q))
 
                 elif gate == "P":
-                    qc.p(param, tgt)
+                    circuit.append(cirq.ZPowGate(exponent=param / math.pi)(q))
 
                 elif gate == "U":
-                    qc.u(param, 0, 0, tgt)
+                    circuit.append(
+                        cirq.MatrixGate(
+                            cirq.unitary(
+                                cirq.PhasedXPowGate(
+                                    exponent=param / math.pi
+                                )
+                            )
+                        )(q)
+                    )
 
                 elif gate in ("CX", "CNOT"):
                     if ctrl is not None:
-                        qc.cx(ctrl, tgt)
+                        circuit.append(cirq.CNOT(qubits[ctrl], q))
 
                 elif gate == "CZ":
                     if ctrl is not None:
-                        qc.cz(ctrl, tgt)
+                        circuit.append(cirq.CZ(qubits[ctrl], q))
 
                 elif gate == "CY":
                     if ctrl is not None:
-                        qc.cy(ctrl, tgt)
+                        circuit.append(
+                            cirq.ControlledGate(cirq.Y)(qubits[ctrl], q)
+                        )
 
                 elif gate == "CH":
                     if ctrl is not None:
-                        qc.ch(ctrl, tgt)
+                        circuit.append(
+                            cirq.ControlledGate(cirq.H)(qubits[ctrl], q)
+                        )
 
                 elif gate == "SWAP":
                     if ctrl is not None:
-                        qc.swap(ctrl, tgt)
+                        circuit.append(cirq.SWAP(qubits[ctrl], q))
 
                 elif gate in ("TOFFOLI", "CCX"):
                     if ctrl is not None and ctrl2 is not None:
-                        qc.ccx(ctrl, ctrl2, tgt)
+                        circuit.append(
+                            cirq.TOFFOLI(
+                                qubits[ctrl],
+                                qubits[ctrl2],
+                                q,
+                            )
+                        )
 
-                # -----------------------------------------
-                # Measurement
-                # -----------------------------------------
                 elif gate in MEASURE_GATES:
-                    if cb > 0 and clbit < cb:
-                        qc.measure(tgt, clbit)
-                        clbit += 1
+                    measurement_targets.append(tgt)
 
-            # -----------------------------------------
-            # Detect measurements
-            # -----------------------------------------
-            has_measurements = len(measurement_ops) > 0
+            has_measurements = len(measurement_targets) > 0
 
-            # -----------------------------------------
-            # Select simulator
-            # -----------------------------------------
-            if include_statevector and not has_measurements:
-                sim = AerSimulator(method="statevector")
-                qc.save_statevector()
-            else:
-                sim = AerSimulator()
+            simulator = cirq.Simulator()
 
-            # -----------------------------------------
-            # Execute
-            # -----------------------------------------
-            job = sim.run(qc, shots=shots)
-            result = job.result()
+            if has_measurements:
+                measured_circuit = circuit.copy()
 
-            counts: Dict[str, int] = {}
-            probabilities: Dict[str, float] = {}
-
-            # -----------------------------------------
-            # Statevector circuit
-            # -----------------------------------------
-            if include_statevector and not has_measurements:
-                sv = result.get_statevector()
-
-                probabilities = {
-                    str(i): float(abs(amp) ** 2)
-                    for i, amp in enumerate(sv)
-                    if abs(amp) > 1e-12
-                }
-
-            # -----------------------------------------
-            # Measured circuit
-            # -----------------------------------------
-            elif has_measurements:
-                raw_counts = result.get_counts()
-
-                if raw_counts:
-                    counts = {
-                        k.replace(" ", ""): int(v)
-                        for k, v in dict(raw_counts).items()
-                    }
-
-                    probabilities = self.get_probabilities(
-                        counts,
-                        shots,
+                for index, target in enumerate(measurement_targets):
+                    measured_circuit.append(
+                        cirq.measure(
+                            qubits[target],
+                            key=f"m{index}",
+                        )
                     )
 
-            # -----------------------------------------
-            # Optional statevector
-            # -----------------------------------------
-            statevector_data = None
-
-            if include_statevector:
-                try:
-                    sv = result.get_statevector()
-
-                    statevector_data = [
-                        [float(amp.real), float(amp.imag)]
-                        for amp in sv
-                    ]
-                except Exception:
-                    statevector_data = None
-
-            # -----------------------------------------
-            # Circuit statistics
-            # -----------------------------------------
-            depth = qc.depth()
-
-            gate_count = sum(
-                1
-                for inst in qc.data
-                if inst.operation.name
-                not in (
-                    "measure",
-                    "barrier",
-                    "save_statevector",
+                result = simulator.run(
+                    measured_circuit,
+                    repetitions=shots,
                 )
-            )
+
+                counts: Dict[str, int] = {}
+
+                for row in result.data.itertuples(index=False):
+                    bits = "".join(
+                        str(getattr(row, f"m{i}"))
+                        for i in range(len(measurement_targets))
+                    )
+
+                    counts[bits] = counts.get(bits, 0) + 1
+
+                probabilities = self.get_probabilities(
+                    counts,
+                    shots,
+                )
+
+                statevector_data = None
+
+            else:
+                result = simulator.simulate(circuit)
+
+                statevector = result.final_state_vector
+
+                probabilities = {
+                    str(i): float(abs(amplitude) ** 2)
+                    for i, amplitude in enumerate(statevector)
+                    if abs(amplitude) > 1e-12
+                }
+
+                counts = {}
+
+                statevector_data = None
+
+                if include_statevector:
+                    statevector_data = [
+                        [
+                            float(amplitude.real),
+                            float(amplitude.imag),
+                        ]
+                        for amplitude in statevector
+                    ]
 
             elapsed_ms = (time.perf_counter() - t0) * 1000
 
@@ -415,8 +385,8 @@ class QiskitAerBackend(QuantumBackend):
                 probabilities=probabilities,
                 statevector=statevector_data,
                 execution_time_ms=elapsed_ms,
-                circuit_depth=depth,
-                gate_count=gate_count,
+                circuit_depth=len(circuit),
+                gate_count=sum(1 for _ in circuit.all_operations()),
             )
 
         except Exception as e:

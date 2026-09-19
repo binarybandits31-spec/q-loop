@@ -1,13 +1,23 @@
 const API_URL = import.meta.env.VITE_API_URL as string || 'http://localhost:8000'
 
+export type QuantumFramework = 'qiskit_aer' | 'pennylane' | 'cirq'
+
 export interface ExecuteRequest {
   qubits: number
   classical_bits?: number
-  operations: { gate: string; target: number; control?: number; control2?: number; parameter?: number }[]
+  operations: {
+    gate: string
+    target: number
+    control?: number
+    control2?: number
+    parameter?: number
+  }[]
   shots?: number
+  framework?: QuantumFramework
 }
 
 export interface ExecuteResponse {
+  success: boolean
   status: string
   framework: string
   shots: number
@@ -35,18 +45,20 @@ export async function executeCircuit(req: ExecuteRequest): Promise<ExecuteRespon
   const data = await res.json()
 
   return {
-  status: data.status,
-  framework: data.framework,
-  shots: data.shots ?? req.shots ?? 1024,
-  counts: data.counts ?? {},
-  probabilities: data.probabilities ?? {},
-  statevector: data.statevector ?? null,
-  execution_time_ms: data.execution_time_ms ?? 0,
-  circuit_depth: data.circuit_depth ?? null,
-  gate_count: data.gate_count ?? 0,
-  error: data.error ?? null,
+    success: data.success ?? data.status === 'success',
+    status: data.status,
+    framework: data.framework,
+    shots: data.shots ?? req.shots ?? 1024,
+    counts: data.counts ?? {},
+    probabilities: data.probabilities ?? {},
+    statevector: data.statevector ?? null,
+    execution_time_ms: data.execution_time_ms ?? 0,
+    circuit_depth: data.circuit_depth ?? null,
+    gate_count: data.gate_count ?? 0,
+    error: data.error ?? null,
+  }
 }
-}
+
 export async function checkHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${API_URL}/api/health`)

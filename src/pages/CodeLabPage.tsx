@@ -49,14 +49,18 @@ export default function CodeLabPage() {
         setOutput(data.output || '(no output)')
         if (data.counts) {
           setExecResult({
-            success: true,
-            counts: data.counts,
-            probabilities: data.probabilities || {},
-            num_qubits: 0,
-            shots: 0,
-            simulator: 'qiskit_aer',
-            error: null,
-          })
+           success: true,
+           status: 'success',
+           framework: 'qiskit_aer',
+           shots: data.shots ?? 0,
+           counts: data.counts,
+           probabilities: data.probabilities || {},
+           statevector: data.statevector ?? null,
+           execution_time_ms: data.execution_time_ms ?? 0,
+           circuit_depth: data.circuit_depth ?? null,
+           gate_count: data.gate_count ?? 0,
+           error: null,
+         })
         }
       }
     } catch (err) {

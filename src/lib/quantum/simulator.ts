@@ -30,8 +30,8 @@ export function applySingleQubitGate(state: StateVector, gateType: GateType, qub
   for (let i = 0; i < dim; i++) {
     const bv = (i >> qubit) & 1
     const i0 = i & ~(1 << qubit)
-    const partner = i0 | ((1 - bv) << qubit)
-    newAmp[i] = cAdd(cMul(m[bv][0], amplitudes[i0]), cMul(m[bv][1], amplitudes[partner]))
+    const i1 = i0 | (1 << qubit)
+    newAmp[i] = cAdd(cMul(m[bv][0], amplitudes[i0]), cMul(m[bv][1], amplitudes[i1]))
   }
   return { amplitudes: newAmp, numQubits }
 }

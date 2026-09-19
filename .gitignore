@@ -30,3 +30,13 @@ __pycache__/
 .pytest_cache/
 # TypeScript
 *.tsbuildinfo
+# Q-Loop additions
+.venv/
+backend/Lib/
+backend/Scripts/
+/env
+*.backup
+*.db
+*.sqlite3
+.env.*
+!.env.example
