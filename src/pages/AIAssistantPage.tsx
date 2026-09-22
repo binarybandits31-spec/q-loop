@@ -253,8 +253,8 @@ export default function AIAssistantPage() {
 
       // Select the correct backend endpoint.
       const endpoint = wantsCode
-        ? 'http://127.0.0.1:8000/api/ai/generate-code'
-        : 'http://127.0.0.1:8000/api/ai/explain'
+        ? 'https://q-loop.onrender.com/api/ai/generate-code'
+        : 'https://q-loop.onrender.com/api/ai/explain'
 
       const action = wantsCode ? 'generate_code' : 'explain'
 

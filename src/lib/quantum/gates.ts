@@ -59,9 +59,76 @@ export function getGateMatrix(type: GateType, param?: number): Complex[][] {
 }
 
 export function getGateTypeFromName(name: string): GateType | null {
-  const u = name.toUpperCase()
-  if (u in GATE_INFO) return u as GateType
-  if (u === 'CNOT') return 'CX'
-  if (u === 'CCNOT' || u === 'CCX') return 'TOFFOLI'
-  return null
+  const normalized = name.trim().toUpperCase()
+
+  switch (normalized) {
+    case 'H':
+      return 'H'
+
+    case 'X':
+      return 'X'
+
+    case 'Y':
+      return 'Y'
+
+    case 'Z':
+      return 'Z'
+
+    case 'S':
+      return 'S'
+
+    case 'T':
+      return 'T'
+
+    case 'SDG':
+    case 'S†':
+    case 'S_DAGGER':
+      return 'Sdg'
+
+    case 'TDG':
+    case 'T†':
+    case 'T_DAGGER':
+      return 'Tdg'
+
+    case 'CX':
+    case 'CNOT':
+      return 'CX'
+
+    case 'CZ':
+      return 'CZ'
+
+    case 'CY':
+      return 'CY'
+
+    case 'CH':
+      return 'CH'
+
+    case 'RX':
+      return 'RX'
+
+    case 'RY':
+      return 'RY'
+
+    case 'RZ':
+      return 'RZ'
+
+    case 'P':
+      return 'P'
+
+    case 'SWAP':
+      return 'SWAP'
+
+    case 'TOFFOLI':
+    case 'CCNOT':
+    case 'CCX':
+      return 'TOFFOLI'
+
+    case 'M':
+    case 'MEASURE':
+    case 'MEASUREMENT':
+      return 'M'
+
+    default:
+      return null
+  }
 }

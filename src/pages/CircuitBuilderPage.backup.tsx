@@ -370,39 +370,16 @@ export default function CircuitBuilderPage() {
     setPendingControl(null)
   }
 
-    const handleSimulate = async () => {
+  const handleSimulate = async () => {
     setSimulating(true)
     setSimError(null)
-
     const circuitGates = toCircuitGates(gates)
-
-    // Keep measurement gates for backend execution.
-    const stateVectorGates = circuitGates.filter(
-      (gate) => gate.type !== 'M'
-    )
-
     const operations = circuitGates.map((g) => {
-      const op: ExecuteRequest['operations'][number] = {
-        gate: g.type,
-        target: g.qubit,
-      }
-
-      if (g.controlQubit !== undefined) {
-        op.control = g.controlQubit
-      }
-
-      if (g.control2Qubit !== undefined) {
-        op.control2 = g.control2Qubit
-      }
-
-      if (g.targetQubit !== undefined) {
-        op.target = g.targetQubit
-      }
-
-      if (g.parameter !== undefined) {
-        op.parameter = g.parameter
-      }
-
+      const op: ExecuteRequest['operations'][number] = { gate: g.type, target: g.qubit }
+      if (g.controlQubit !== undefined) op.control = g.controlQubit
+      if (g.control2Qubit !== undefined) op.control2 = g.control2Qubit
+      if (g.targetQubit !== undefined) op.target = g.targetQubit
+      if (g.parameter !== undefined) op.parameter = g.parameter
       return op
     })
 
@@ -416,71 +393,32 @@ export default function CircuitBuilderPage() {
 
       if (!res.success || res.error) {
         setSimError(res.error || 'Execution failed')
-
-        // Local fallback simulation.
-        // Exclude measurement gates so the state vector
-        // represents the state before measurement.
-        const local = simulateCircuit(
-          stateVectorGates,
-          numQubits,
-          1024
-        )
-
+        // fall back to local sim so the UI still shows something
+        const local = simulateCircuit(circuitGates, numQubits, 1024)
         setSimResult(local)
       } else {
-        // Convert backend measurement counts into
-        // the frontend histogram format.
+        // Map backend response to the frontend SimulationResult shape
         const histogram = Object.entries(res.counts)
-          .map(([state, count]) => ({
-            state,
-            count,
-            probability:
-              res.probabilities[state] ?? count / res.shots,
-          }))
+          .map(([state, count]) => ({ state, count, probability: res.probabilities[state] ?? count / res.shots }))
           .sort((a, b) => b.count - a.count)
-
-        // Calculate the pre-measurement state vector.
-        // Measurement gates are intentionally excluded.
-        const local = simulateCircuit(
-          stateVectorGates,
-          numQubits,
-          0
-        )
-
+        const local = simulateCircuit(circuitGates, numQubits, 0)
         setSimResult({
           stateVector: local.stateVector,
           probabilities: local.probabilities,
-          measurements: [
-            {
-              outcome: '',
-              probability: 1,
-              counts: res.counts,
-            },
-          ],
+          measurements: [{ outcome: '', probability: 1, counts: res.counts }],
           measuredQubits: new Set<number>(),
           histogram,
         })
       }
     } catch (err) {
-      setSimError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to connect to backend'
-      )
-
-      // Local fallback when the backend connection fails.
-      // Exclude measurement gates from the state-vector calculation.
-      const local = simulateCircuit(
-        stateVectorGates,
-        numQubits,
-        1024
-      )
-
+      setSimError(err instanceof Error ? err.message : 'Failed to connect to backend')
+      // fall back to local simulation
+      const local = simulateCircuit(circuitGates, numQubits, 1024)
       setSimResult(local)
     } finally {
       setSimulating(false)
     }
-  } 
+  }
 
   const handleClear = () => {
     setGates([])
