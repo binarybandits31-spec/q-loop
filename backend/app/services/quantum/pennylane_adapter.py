@@ -20,7 +20,10 @@ class PennyLaneBackend(QuantumBackend):
 
             qml.device("default.qubit", wires=1)
             return True
-        except Exception:
+        except Exception as exc:
+            import traceback
+            print(f"PennyLane is_available check failed: {exc}")
+            traceback.print_exc()
             return False
 
     def validate(self, circuit_data: dict) -> List[dict]:
