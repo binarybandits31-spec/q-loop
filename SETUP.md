@@ -38,6 +38,10 @@ Copy-Item .env.example .env
 Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Get them from Joy **privately**,
 not through the repo or a public chat.
 
+Also set `OPENAI_API_KEY` in this same root `.env` file. The backend only reads the `.env`
+in the folder you start it from. Without a key, the AI Tutor falls back to short built-in
+answers. Get the key from Joy privately, or use your own.
+
 ## 3. Create the database
 
 The backend expects a PostgreSQL database named `qloop`. By default it connects as user
