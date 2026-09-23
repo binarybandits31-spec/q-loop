@@ -5,13 +5,23 @@ export type QuantumFramework = 'qiskit_aer' | 'pennylane' | 'cirq'
 export interface ExecuteRequest {
   qubits: number
   classical_bits?: number
+
   operations: {
     gate: string
     target: number
+
+    // Multi-qubit gate support
     control?: number
     control2?: number
+
+    // Parameterized gate support
     parameter?: number
+
+    // Classical conditional operation support
+    condition_bit?: number
+    condition_value?: number
   }[]
+
   shots?: number
   framework?: QuantumFramework
 }
@@ -30,16 +40,23 @@ export interface ExecuteResponse {
   error: string | null
 }
 
-export async function executeCircuit(req: ExecuteRequest): Promise<ExecuteResponse> {
+export async function executeCircuit(
+  req: ExecuteRequest
+): Promise<ExecuteResponse> {
   const res = await fetch(`${API_URL}/api/simulator/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(req),
   })
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Backend returned ${res.status}: ${text || res.statusText}`)
+
+    throw new Error(
+      `Backend returned ${res.status}: ${text || res.statusText}`
+    )
   }
 
   const data = await res.json()

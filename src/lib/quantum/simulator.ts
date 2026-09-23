@@ -1,4 +1,3 @@
-
 import {
   Complex,
   c,
@@ -20,6 +19,8 @@ export interface CircuitGate {
   controlQubit?: number
   control2Qubit?: number
   parameter?: number
+  condition_bit?: number
+  condition_value?: number
 }
 
 export interface StateVector {
@@ -72,7 +73,6 @@ export function applySingleQubitGate(
 ): StateVector {
   const { numQubits, amplitudes } = state
   const dim = 2 ** numQubits
-
   const m = getGateMatrix(gateType, param)
 
   const newAmp: Complex[] = Array(dim)
@@ -216,6 +216,7 @@ export function applyToffoliGate(
 
       if (i < partner) {
         const tmp = newAmp[i]
+
         newAmp[i] = newAmp[partner]
         newAmp[partner] = tmp
       }
@@ -288,7 +289,34 @@ export function simulateCircuit(
   const measuredQubits = new Set<number>()
   const measurements: MeasurementResult[] = []
 
+  // Classical register used by conditional operations.
+  // Key = classical bit index
+  // Value = measurement result (0 or 1)
+  const classicalBits: Record<number, number> = {}
+
+  // Measurements are assigned classical bits in measurement order.
+  let nextClassicalBit = 0
+
   for (const gate of gates) {
+    /*
+     * Check classical condition before executing the gate.
+     *
+     * Example:
+     * condition_bit = 0
+     * condition_value = 1
+     *
+     * means:
+     * "Execute this gate only when classical bit 0 == 1."
+     */
+    if (gate.condition_bit !== undefined) {
+      const actualValue = classicalBits[gate.condition_bit] ?? 0
+      const expectedValue = gate.condition_value ?? 1
+
+      if (actualValue !== expectedValue) {
+        continue
+      }
+    }
+
     switch (gate.type) {
       case 'M': {
         const {
@@ -299,6 +327,11 @@ export function simulateCircuit(
         state = nextState
 
         measuredQubits.add(gate.qubit)
+
+        // Store the measurement result in the next classical bit.
+        classicalBits[nextClassicalBit] = outcome
+
+        nextClassicalBit += 1
 
         measurements.push({
           outcome,
@@ -558,6 +591,14 @@ export function circuitToJson(
 
     if (g.parameter !== undefined) {
       op.parameter = g.parameter
+    }
+
+    if (g.condition_bit !== undefined) {
+      op.condition_bit = g.condition_bit
+    }
+
+    if (g.condition_value !== undefined) {
+      op.condition_value = g.condition_value
     }
 
     return op

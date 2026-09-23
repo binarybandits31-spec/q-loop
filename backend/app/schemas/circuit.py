@@ -17,6 +17,8 @@ class CircuitOperation(BaseModel):
     control: Optional[int] = None
     control2: Optional[int] = None
     parameter: Optional[float] = None
+    condition_bit: Optional[int] = None
+    condition_value: Optional[int] = None
 
     @field_validator("gate")
     @classmethod
@@ -98,6 +100,8 @@ class CircuitExecuteOperation(BaseModel):
     control: Optional[int] = None
     control2: Optional[int] = None
     parameter: Optional[float] = None
+    condition_bit: Optional[int] = None
+    condition_value: Optional[int] = None
 
 
 class CircuitExecuteRequest(BaseModel):

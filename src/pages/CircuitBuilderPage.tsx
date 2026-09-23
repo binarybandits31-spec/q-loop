@@ -40,10 +40,22 @@ interface PlacedGate {
   controlQubit?: number
   control2Qubit?: number
   parameter?: number
+
+  // Classical conditional execution.
+  // Example:
+  // condition_bit: 0
+  // condition_value: 1
+  condition_bit?: number
+  condition_value?: number
+
   column: number
 }
 
-type PresetName = 'Bell State' | 'GHZ State' | 'Quantum Teleportation' | "Grover's (2-qubit)"
+type PresetName =
+  | 'Bell State'
+  | 'GHZ State'
+  | 'Quantum Teleportation'
+  | "Grover's (2-qubit)"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -56,6 +68,7 @@ const MAX_COLUMNS = 20
 type GateCategory = 'single' | 'two' | 'three' | 'measure'
 
 const CATEGORY_ORDER: GateCategory[] = ['single', 'two', 'three', 'measure']
+
 const CATEGORY_LABEL: Record<GateCategory, string> = {
   single: 'Single-Qubit',
   two: 'Two-Qubit',
@@ -63,17 +76,26 @@ const CATEGORY_LABEL: Record<GateCategory, string> = {
   measure: 'Measurement',
 }
 
-const GATES_BY_CATEGORY: Record<GateCategory, GateType[]> = CATEGORY_ORDER.reduce(
-  (acc, cat) => {
-    acc[cat] = (Object.keys(GATE_INFO) as GateType[]).filter((g) => GATE_INFO[g].category === cat)
-    return acc
-  },
-  {} as Record<GateCategory, GateType[]>
-)
+const GATES_BY_CATEGORY: Record<GateCategory, GateType[]> =
+  CATEGORY_ORDER.reduce(
+    (acc, cat) => {
+      acc[cat] = (Object.keys(GATE_INFO) as GateType[]).filter(
+        (g) => GATE_INFO[g].category === cat
+      )
+      return acc
+    },
+    {} as Record<GateCategory, GateType[]>
+  )
 
 const SEVERITY_STYLE: Record<
   AnalysisFinding['severity'],
-  { color: string; bg: string; border: string; Icon: typeof AlertTriangle; label: string }
+  {
+    color: string
+    bg: string
+    border: string
+    Icon: typeof AlertTriangle
+    label: string
+  }
 > = {
   error: {
     color: 'text-rose-300',
@@ -111,13 +133,23 @@ const SEVERITY_STYLE: Record<
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-/** Convert PlacedGate[] (column-aware) into the column-ordered CircuitGate[] the simulator expects. */
+/** Convert PlacedGate[] into the column-ordered CircuitGate[] expected by the simulator. */
 function toCircuitGates(placed: PlacedGate[]): CircuitGate[] {
-  return [...placed].sort((a, b) => a.column - b.column).map((g) => ({
-    id: g.id, type: g.type, qubit: g.qubit,
-    targetQubit: g.targetQubit, controlQubit: g.controlQubit,
-    control2Qubit: g.control2Qubit, parameter: g.parameter,
-  }))
+  return [...placed]
+    .sort((a, b) => a.column - b.column)
+    .map((g) => ({
+      id: g.id,
+      type: g.type,
+      qubit: g.qubit,
+      targetQubit: g.targetQubit,
+      controlQubit: g.controlQubit,
+      control2Qubit: g.control2Qubit,
+      parameter: g.parameter,
+
+      // Preserve classical conditions.
+      condition_bit: g.condition_bit,
+      condition_value: g.condition_value,
+    }))
 }
 
 /** How many distinct columns are currently in use? */
@@ -125,10 +157,22 @@ function usedColumns(gates: PlacedGate[]): number {
   return gates.reduce((m, g) => Math.max(m, g.column + 1), 0)
 }
 
-/** Find the next free column index (avoids landing on a column already fully occupied on this qubit). */
-function nextFreeColumn(gates: PlacedGate[], qubit: number, from: number): number {
+/** Find the next free column index. */
+function nextFreeColumn(
+  gates: PlacedGate[],
+  qubit: number,
+  from: number
+): number {
   let col = from
-  while (gates.some((g) => g.column === col && occupiesQubit(g, qubit))) col++
+
+  while (
+    gates.some(
+      (g) => g.column === col && occupiesQubit(g, qubit)
+    )
+  ) {
+    col++
+  }
+
   return col
 }
 
@@ -142,26 +186,46 @@ function occupiesQubit(g: PlacedGate, q: number): boolean {
 }
 
 /** Does any gate already occupy this (qubit, column) cell? */
-function cellOccupied(gates: PlacedGate[], qubit: number, column: number): boolean {
-  return gates.some((g) => g.column === column && occupiesQubit(g, qubit))
+function cellOccupied(
+  gates: PlacedGate[],
+  qubit: number,
+  column: number
+): boolean {
+  return gates.some(
+    (g) => g.column === column && occupiesQubit(g, qubit)
+  )
 }
 
 /** The PlacedGate sitting on a given (qubit, column) cell, if any. */
-function gateAtCell(gates: PlacedGate[], qubit: number, column: number): PlacedGate | undefined {
-  return gates.find((g) => g.column === column && occupiesQubit(g, qubit))
+function gateAtCell(
+  gates: PlacedGate[],
+  qubit: number,
+  column: number
+): PlacedGate | undefined {
+  return gates.find(
+    (g) => g.column === column && occupiesQubit(g, qubit)
+  )
 }
 
 /* ------------------------------------------------------------------ */
 /* Presets                                                             */
 /* ------------------------------------------------------------------ */
 
-function makePreset(name: PresetName): { numQubits: number; gates: PlacedGate[] } {
+function makePreset(
+  name: PresetName
+): { numQubits: number; gates: PlacedGate[] } {
   const mk = (
     type: GateType,
     qubit: number,
     column: number,
     extra: Partial<PlacedGate> = {}
-  ): PlacedGate => ({ id: uid(), type, qubit, column, ...extra })
+  ): PlacedGate => ({
+    id: uid(),
+    type,
+    qubit,
+    column,
+    ...extra,
+  })
 
   switch (name) {
     case 'Bell State':
@@ -169,38 +233,95 @@ function makePreset(name: PresetName): { numQubits: number; gates: PlacedGate[] 
         numQubits: 2,
         gates: [
           mk('H', 0, 0),
-          mk('CX', 0, 1, { controlQubit: 0, targetQubit: 1 }),
+          mk('CX', 0, 1, {
+            controlQubit: 0,
+            targetQubit: 1,
+          }),
           mk('M', 0, 2),
           mk('M', 1, 2),
         ],
       }
+
     case 'GHZ State':
       return {
         numQubits: 3,
         gates: [
           mk('H', 0, 0),
-          mk('CX', 0, 1, { controlQubit: 0, targetQubit: 1 }),
-          mk('CX', 1, 2, { controlQubit: 1, targetQubit: 2 }),
+          mk('CX', 0, 1, {
+            controlQubit: 0,
+            targetQubit: 1,
+          }),
+          mk('CX', 1, 2, {
+            controlQubit: 1,
+            targetQubit: 2,
+          }),
           mk('M', 0, 3),
           mk('M', 1, 3),
           mk('M', 2, 3),
         ],
       }
+
     case 'Quantum Teleportation':
+      /*
+       * Quantum Teleportation
+       *
+       * q0 = input state |+>
+       * q1,q2 = Bell pair
+       *
+       * 1. Prepare |+> on q0.
+       * 2. Create Bell pair between q1 and q2.
+       * 3. Bell-basis interaction between q0 and q1.
+       * 4. Measure q0 -> classical bit c0.
+       * 5. Measure q1 -> classical bit c1.
+       * 6. Apply Z(q2) only if c0 == 1.
+       * 7. Apply X(q2) only if c1 == 1.
+       *
+       * The frontend/backend measurement mapping is:
+       * first M -> c0
+       * second M -> c1
+       */
+
       return {
         numQubits: 3,
         gates: [
+          // Prepare input state |+> on q0.
+          mk('H', 0, 0),
+
+          // Create Bell pair between q1 and q2.
           mk('H', 1, 0),
-          mk('CX', 1, 1, { controlQubit: 1, targetQubit: 2 }),
-          mk('CX', 0, 2, { controlQubit: 0, targetQubit: 1 }),
+          mk('CX', 1, 1, {
+            controlQubit: 1,
+            targetQubit: 2,
+          }),
+
+          // Bell-basis operations on q0 and q1.
+          mk('CX', 0, 2, {
+            controlQubit: 0,
+            targetQubit: 1,
+          }),
           mk('H', 0, 3),
+
+          // Measurements:
+          // first measurement = c0
+          // second measurement = c1
           mk('M', 0, 4),
           mk('M', 1, 4),
-          // classical-correction gates (illustrative — applied unconditionally)
-          mk('Z', 2, 5),
-          mk('X', 2, 6),
+
+          // Conditional corrections on q2.
+          // Z(q2) if c0 == 1.
+          mk('Z', 2, 5, {
+            condition_bit: 0,
+            condition_value: 1,
+          }),
+
+          // X(q2) if c1 == 1.
+          mk('X', 2, 6, {
+            condition_bit: 1,
+            condition_value: 1,
+          }),
         ],
       }
+
     case "Grover's (2-qubit)": {
       // 2-qubit Grover: H⊗H, oracle (mark |11>), diffusion.
       return {
@@ -208,18 +329,31 @@ function makePreset(name: PresetName): { numQubits: number; gates: PlacedGate[] 
         gates: [
           mk('H', 0, 0),
           mk('H', 1, 0),
+
           // Oracle: mark |11⟩ via CZ
-          mk('CZ', 0, 1, { controlQubit: 0, targetQubit: 1 }),
-          // Diffusion operator: H, X, CZ, X, H on both qubits
+          mk('CZ', 0, 1, {
+            controlQubit: 0,
+            targetQubit: 1,
+          }),
+
+          // Diffusion operator
           mk('H', 0, 2),
           mk('H', 1, 2),
+
           mk('X', 0, 3),
           mk('X', 1, 3),
-          mk('CZ', 0, 4, { controlQubit: 0, targetQubit: 1 }),
+
+          mk('CZ', 0, 4, {
+            controlQubit: 0,
+            targetQubit: 1,
+          }),
+
           mk('X', 0, 5),
           mk('X', 1, 5),
+
           mk('H', 0, 6),
           mk('H', 1, 6),
+
           mk('M', 0, 7),
           mk('M', 1, 7),
         ],
@@ -236,19 +370,22 @@ export default function CircuitBuilderPage() {
   const [numQubits, setNumQubits] = useState(2)
   const [gates, setGates] = useState<PlacedGate[]>([])
   const [selectedGate, setSelectedGate] = useState<GateType>('H')
-  const [simResult, setSimResult] = useState<SimulationResult | null>(null)
+  const [simResult, setSimResult] =
+    useState<SimulationResult | null>(null)
   const [simulating, setSimulating] = useState(false)
   const [simError, setSimError] = useState<string | null>(null)
+
   const [pendingControl, setPendingControl] = useState<{
     qubit: number
     column: number
   } | null>(null)
-  // Second pending slot used only for three-qubit Toffoli placement
-  // (control 1 → control 2 → target).
+
+  // Second pending slot used only for three-qubit Toffoli placement.
   const [pendingControl2, setPendingControl2] = useState<{
     qubit: number
     column: number
   } | null>(null)
+
   const [activeColumn, setActiveColumn] = useState(0)
 
   const findings = useMemo<AnalysisFinding[]>(
@@ -256,7 +393,12 @@ export default function CircuitBuilderPage() {
     [gates, numQubits]
   )
 
-  const columnCount = Math.max(usedColumns(gates) + 1, activeColumn + 1, 8)
+  const columnCount = Math.max(
+    usedColumns(gates) + 1,
+    activeColumn + 1,
+    8
+  )
+
   const displayColumns = Math.min(columnCount, MAX_COLUMNS)
 
   /* --------------------------- handlers --------------------------- */
@@ -265,8 +407,11 @@ export default function CircuitBuilderPage() {
     setActiveColumn(column)
 
     const existing = gateAtCell(gates, qubit, column)
+
     if (existing) {
-      setGates((gs) => gs.filter((g) => g.id !== existing.id))
+      setGates((gs) =>
+        gs.filter((g) => g.id !== existing.id)
+      )
       setPendingControl(null)
       setPendingControl2(null)
       return
@@ -277,15 +422,31 @@ export default function CircuitBuilderPage() {
     if (info.hasParameter) {
       setGates((gs) => [
         ...gs,
-        { id: uid(), type: selectedGate, qubit, column, parameter: Math.PI / 2 },
+        {
+          id: uid(),
+          type: selectedGate,
+          qubit,
+          column,
+          parameter: Math.PI / 2,
+        },
       ])
+
       setPendingControl(null)
       setPendingControl2(null)
       return
     }
 
     if (!info.isMultiQubit) {
-      setGates((gs) => [...gs, { id: uid(), type: selectedGate, qubit, column }])
+      setGates((gs) => [
+        ...gs,
+        {
+          id: uid(),
+          type: selectedGate,
+          qubit,
+          column,
+        },
+      ])
+
       setPendingControl(null)
       setPendingControl2(null)
       return
@@ -296,26 +457,37 @@ export default function CircuitBuilderPage() {
         setPendingControl({ qubit, column })
         return
       }
+
       if (pendingControl.qubit === qubit) {
         setPendingControl({ qubit, column })
         setPendingControl2(null)
         return
       }
+
       if (!pendingControl2) {
         setPendingControl2({ qubit, column })
         return
       }
-      if (pendingControl2.qubit === qubit || pendingControl.qubit === qubit) {
-        // restart from this qubit as first control
+
+      if (
+        pendingControl2.qubit === qubit ||
+        pendingControl.qubit === qubit
+      ) {
         setPendingControl({ qubit, column })
         setPendingControl2(null)
         return
       }
+
       const col = nextFreeColumn(
         gates,
         qubit,
-        Math.max(pendingControl.column, pendingControl2.column, column)
+        Math.max(
+          pendingControl.column,
+          pendingControl2.column,
+          column
+        )
       )
+
       setGates((gs) => [
         ...gs,
         {
@@ -328,21 +500,29 @@ export default function CircuitBuilderPage() {
           column: col,
         },
       ])
+
       setPendingControl(null)
       setPendingControl2(null)
       return
     }
 
-    // Two-qubit multi-qubit gates (CX, CZ, CY, CH, SWAP)
+    // Two-qubit multi-qubit gates.
     if (!pendingControl) {
       setPendingControl({ qubit, column })
       return
     }
+
     if (pendingControl.qubit === qubit) {
       setPendingControl({ qubit, column })
       return
     }
-    const col = nextFreeColumn(gates, qubit, Math.max(pendingControl.column, column))
+
+    const col = nextFreeColumn(
+      gates,
+      qubit,
+      Math.max(pendingControl.column, column)
+    )
+
     if (selectedGate === 'SWAP') {
       setGates((gs) => [
         ...gs,
@@ -367,10 +547,11 @@ export default function CircuitBuilderPage() {
         },
       ])
     }
+
     setPendingControl(null)
   }
 
-    const handleSimulate = async () => {
+  const handleSimulate = async () => {
     setSimulating(true)
     setSimError(null)
 
@@ -401,6 +582,15 @@ export default function CircuitBuilderPage() {
 
       if (g.parameter !== undefined) {
         op.parameter = g.parameter
+      }
+
+      // Send classical conditional execution to the backend.
+      if (g.condition_bit !== undefined) {
+        op.condition_bit = g.condition_bit
+      }
+
+      if (g.condition_value !== undefined) {
+        op.condition_value = g.condition_value
       }
 
       return op
@@ -435,7 +625,8 @@ export default function CircuitBuilderPage() {
             state,
             count,
             probability:
-              res.probabilities[state] ?? count / res.shots,
+              res.probabilities[state] ??
+              count / res.shots,
           }))
           .sort((a, b) => b.count - a.count)
 
@@ -480,7 +671,7 @@ export default function CircuitBuilderPage() {
     } finally {
       setSimulating(false)
     }
-  } 
+  }
 
   const handleClear = () => {
     setGates([])
@@ -491,7 +682,9 @@ export default function CircuitBuilderPage() {
   }
 
   const handlePreset = (name: PresetName) => {
-    const { numQubits: n, gates: gs } = makePreset(name)
+    const { numQubits: n, gates: gs } =
+      makePreset(name)
+
     setNumQubits(n)
     setGates(gs)
     setPendingControl(null)
@@ -501,44 +694,79 @@ export default function CircuitBuilderPage() {
   }
 
   const handleExport = () => {
-    const json = circuitToJson(toCircuitGates(gates), numQubits)
-    const blob = new Blob([json], { type: 'application/json' })
+    const json = circuitToJson(
+      toCircuitGates(gates),
+      numQubits
+    )
+
+    const blob = new Blob([json], {
+      type: 'application/json',
+    })
+
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
+
     a.href = url
     a.download = 'circuit.json'
     a.click()
+
     URL.revokeObjectURL(url)
   }
 
   const adjustQubits = (delta: number) => {
-    const next = Math.min(MAX_QUBITS, Math.max(MIN_QUBITS, numQubits + delta))
+    const next = Math.min(
+      MAX_QUBITS,
+      Math.max(MIN_QUBITS, numQubits + delta)
+    )
+
     if (next === numQubits) return
+
     setNumQubits(next)
-    // drop gates that reference now-removed qubits
+
+    // Drop gates that reference now-removed qubits.
     setGates((gs) =>
       gs.filter(
         (g) =>
           g.qubit < next &&
-          (g.targetQubit === undefined || g.targetQubit < next) &&
-          (g.controlQubit === undefined || g.controlQubit < next) &&
-          (g.control2Qubit === undefined || g.control2Qubit < next)
+          (g.targetQubit === undefined ||
+            g.targetQubit < next) &&
+          (g.controlQubit === undefined ||
+            g.controlQubit < next) &&
+          (g.control2Qubit === undefined ||
+            g.control2Qubit < next)
       )
     )
+
     setPendingControl(null)
     setPendingControl2(null)
   }
 
   /* --------------------------- derived ---------------------------- */
 
-  const stateVectorRows = simResult ? formatStateVector(simResult.stateVector) : []
+  const stateVectorRows = simResult
+    ? formatStateVector(simResult.stateVector)
+    : []
+
   const maxProb = simResult
-    ? Math.max(...simResult.histogram.map((h) => h.probability), 0.0001)
+    ? Math.max(
+        ...simResult.histogram.map(
+          (h) => h.probability
+        ),
+        0.0001
+      )
     : 1
 
-  const errorCount = findings.filter((f) => f.severity === 'error').length
-  const warnCount = findings.filter((f) => f.severity === 'warning').length
-  const optCount = findings.filter((f) => f.severity === 'optimization').length
+  const errorCount = findings.filter(
+    (f) => f.severity === 'error'
+  ).length
+
+  const warnCount = findings.filter(
+    (f) => f.severity === 'warning'
+  ).length
+
+  const optCount = findings.filter(
+    (f) => f.severity === 'optimization'
+  ).length
 
   const selectedInfo = GATE_INFO[selectedGate]
 
@@ -559,66 +787,97 @@ export default function CircuitBuilderPage() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-cyan-400">
               <CircuitBoard className="h-6 w-6" />
+
               <span className="text-sm font-medium uppercase tracking-widest">
                 Q-loop · Circuit Builder
               </span>
             </div>
+
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
                 Quantum Circuit Builder
               </span>
             </h1>
+
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Drag ideas into reality. Place gates on the canvas, run the
-              simulator, and inspect the resulting state vector, measurement
-              histogram, and circuit analysis.
+              Drag ideas into reality. Place gates on the canvas,
+              run the simulator, and inspect the resulting state
+              vector, measurement histogram, and circuit analysis.
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={handleSimulate}
               disabled={simulating}
               className="bg-cyan-500 text-[#05070d] hover:bg-cyan-400"
             >
-              {simulating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              {simulating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+
               {simulating ? 'Running…' : 'Simulate'}
             </Button>
-            <Button variant="outline" onClick={handleExport} className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10">
-              <Download className="mr-2 h-4 w-4" /> Export JSON
+
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export JSON
             </Button>
-            <Button variant="outline" onClick={handleClear} className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10">
-              <Trash2 className="mr-2 h-4 w-4" /> Clear
+
+            <Button
+              variant="outline"
+              onClick={handleClear}
+              className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear
             </Button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
           {/* ---------------- Left sidebar ---------------- */}
+
           <aside className="space-y-4">
             {/* Gate palette */}
             <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                  <Zap className="h-4 w-4 text-cyan-400" /> Gate Palette
+                  <Zap className="h-4 w-4 text-cyan-400" />
+                  Gate Palette
                 </CardTitle>
               </CardHeader>
+
               <CardContent className="space-y-4">
                 {CATEGORY_ORDER.map((cat) => (
                   <div key={cat}>
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {CATEGORY_LABEL[cat]}
                     </p>
+
                     <div className="grid grid-cols-4 gap-1.5">
                       {GATES_BY_CATEGORY[cat].map((g) => {
                         const info = GATE_INFO[g]
                         const active = selectedGate === g
+
                         return (
                           <button
                             key={g}
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/x-qloop-gate', g)
+                              e.dataTransfer.setData(
+                                'application/x-qloop-gate',
+                                g
+                              )
+
                               e.dataTransfer.effectAllowed = 'copy'
+
                               setSelectedGate(g)
                               setPendingControl(null)
                               setPendingControl2(null)
@@ -640,7 +899,9 @@ export default function CircuitBuilderPage() {
                               background: active
                                 ? `${info.color}22`
                                 : 'rgba(255,255,255,0.03)',
-                              boxShadow: active ? `0 0 16px ${info.color}55` : undefined,
+                              boxShadow: active
+                                ? `0 0 16px ${info.color}55`
+                                : undefined,
                             }}
                           >
                             {info.symbol}
@@ -657,9 +918,11 @@ export default function CircuitBuilderPage() {
             <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                  <Info className="h-4 w-4 text-cyan-400" /> Selected Gate
+                  <Info className="h-4 w-4 text-cyan-400" />
+                  Selected Gate
                 </CardTitle>
               </CardHeader>
+
               <CardContent>
                 <div className="flex items-center gap-3">
                   <div
@@ -672,10 +935,12 @@ export default function CircuitBuilderPage() {
                   >
                     {selectedInfo.symbol}
                   </div>
+
                   <div>
                     <p className="text-sm font-semibold text-slate-100">
                       {selectedInfo.name}
                     </p>
+
                     <p className="text-xs text-slate-400">
                       {selectedInfo.isMultiQubit
                         ? selectedGate === 'TOFFOLI'
@@ -687,14 +952,18 @@ export default function CircuitBuilderPage() {
                     </p>
                   </div>
                 </div>
+
                 <p className="mt-3 text-xs leading-relaxed text-slate-400">
                   {selectedInfo.description}
                 </p>
+
                 {pendingControl && (
                   <p className="mt-3 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-200">
-                    {selectedGate === 'TOFFOLI' && !pendingControl2
+                    {selectedGate === 'TOFFOLI' &&
+                    !pendingControl2
                       ? `Control 1 set on q[${pendingControl.qubit}] — pick control 2`
-                      : selectedGate === 'TOFFOLI' && pendingControl2
+                      : selectedGate === 'TOFFOLI' &&
+                        pendingControl2
                       ? `Controls on q[${pendingControl.qubit}] & q[${pendingControl2.qubit}] — pick target`
                       : `Control set on q[${pendingControl.qubit}] — pick target`}
                   </p>
@@ -706,9 +975,11 @@ export default function CircuitBuilderPage() {
             <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                  <CircuitBoard className="h-4 w-4 text-cyan-400" /> Preset Circuits
+                  <CircuitBoard className="h-4 w-4 text-cyan-400" />
+                  Preset Circuits
                 </CardTitle>
               </CardHeader>
+
               <CardContent className="space-y-2">
                 {(
                   [
@@ -732,14 +1003,16 @@ export default function CircuitBuilderPage() {
           </aside>
 
           {/* ---------------- Main area ---------------- */}
+
           <main className="space-y-6">
-            {/* Toolbar: qubit count + status */}
+            {/* Toolbar */}
             <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
               <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                     Qubits
                   </span>
+
                   <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-1">
                     <Button
                       size="icon"
@@ -750,9 +1023,11 @@ export default function CircuitBuilderPage() {
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
+
                     <span className="w-8 text-center text-sm font-semibold tabular-nums text-cyan-300">
                       {numQubits}
                     </span>
+
                     <Button
                       size="icon"
                       variant="ghost"
@@ -763,6 +1038,7 @@ export default function CircuitBuilderPage() {
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
+
                   <span className="text-xs text-slate-500">
                     ({MIN_QUBITS}–{MAX_QUBITS})
                   </span>
@@ -770,11 +1046,19 @@ export default function CircuitBuilderPage() {
 
                 <div className="flex items-center gap-4 text-xs text-slate-400">
                   <span>
-                    Gates: <span className="font-semibold text-slate-200">{gates.length}</span>
+                    Gates:{' '}
+                    <span className="font-semibold text-slate-200">
+                      {gates.length}
+                    </span>
                   </span>
+
                   <span>
-                    Columns: <span className="font-semibold text-slate-200">{usedColumns(gates)}</span>
+                    Columns:{' '}
+                    <span className="font-semibold text-slate-200">
+                      {usedColumns(gates)}
+                    </span>
                   </span>
+
                   <span className="flex items-center gap-1">
                     <span
                       className={cn(
@@ -786,10 +1070,15 @@ export default function CircuitBuilderPage() {
                           : 'bg-emerald-400'
                       )}
                     />
+
                     {errorCount > 0
-                      ? `${errorCount} error${errorCount > 1 ? 's' : ''}`
+                      ? `${errorCount} error${
+                          errorCount > 1 ? 's' : ''
+                        }`
                       : warnCount > 0
-                      ? `${warnCount} warning${warnCount > 1 ? 's' : ''}`
+                      ? `${warnCount} warning${
+                          warnCount > 1 ? 's' : ''
+                        }`
                       : 'circuit OK'}
                   </span>
                 </div>
@@ -799,14 +1088,20 @@ export default function CircuitBuilderPage() {
             {/* Circuit canvas */}
             <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-200">Circuit Canvas</CardTitle>
+                <CardTitle className="text-sm text-slate-200">
+                  Circuit Canvas
+                </CardTitle>
               </CardHeader>
+
               <CardContent className="overflow-x-auto">
                 <div className="min-w-max">
                   {/* column header */}
                   <div className="flex">
                     <div className="w-16 shrink-0" />
-                    {Array.from({ length: displayColumns }).map((_, c) => (
+
+                    {Array.from({
+                      length: displayColumns,
+                    }).map((_, c) => (
                       <div
                         key={c}
                         className={cn(
@@ -822,36 +1117,68 @@ export default function CircuitBuilderPage() {
                   </div>
 
                   {/* qubit rows */}
-                  {Array.from({ length: numQubits }).map((_, q) => (
-                    <div key={q} className="flex items-center">
+                  {Array.from({
+                    length: numQubits,
+                  }).map((_, q) => (
+                    <div
+                      key={q}
+                      className="flex items-center"
+                    >
                       <div className="flex w-16 shrink-0 items-center gap-1.5 pr-2">
                         <span className="text-xs font-medium text-slate-300">
                           q[{q}]
                         </span>
+
                         <span className="text-[10px] text-slate-600">
                           |0⟩
                         </span>
                       </div>
 
-                      {Array.from({ length: displayColumns }).map((_, c) => {
-                        const gate = gateAtCell(gates, q, c)
+                      {Array.from({
+                        length: displayColumns,
+                      }).map((_, c) => {
+                        const gate = gateAtCell(
+                          gates,
+                          q,
+                          c
+                        )
+
                         const occupied = !!gate
+
                         const isPending =
-                          (pendingControl?.qubit === q && pendingControl?.column === c) ||
-                          (pendingControl2?.qubit === q && pendingControl2?.column === c)
-                        const isActive = activeColumn === c
+                          (pendingControl?.qubit === q &&
+                            pendingControl?.column === c) ||
+                          (pendingControl2?.qubit === q &&
+                            pendingControl2?.column === c)
+
+                        const isActive =
+                          activeColumn === c
+
                         return (
                           <div
                             key={c}
-                            onClick={() => onCellClick(q, c)}
+                            onClick={() =>
+                              onCellClick(q, c)
+                            }
                             onDragOver={(e) => {
                               e.preventDefault()
-                              e.dataTransfer.dropEffect = 'copy'
+                              e.dataTransfer.dropEffect =
+                                'copy'
                             }}
                             onDrop={(e) => {
                               e.preventDefault()
-                              const gate = e.dataTransfer.getData('application/x-qloop-gate') as GateType
-                              if (!gate || !GATE_INFO[gate]) return
+
+                              const gate = e.dataTransfer.getData(
+                                'application/x-qloop-gate'
+                              ) as GateType
+
+                              if (
+                                !gate ||
+                                !GATE_INFO[gate]
+                              ) {
+                                return
+                              }
+
                               setSelectedGate(gate)
                               setPendingControl(null)
                               setPendingControl2(null)
@@ -860,9 +1187,14 @@ export default function CircuitBuilderPage() {
                             className={cn(
                               'group relative flex h-14 w-16 cursor-pointer items-center justify-center transition-all',
                               'border-r border-t border-white/[0.04]',
-                              isActive && !occupied && 'bg-cyan-500/[0.06]',
-                              isPending && 'bg-cyan-500/20',
-                              !occupied && !isPending && 'hover:bg-white/[0.04]'
+                              isActive &&
+                                !occupied &&
+                                'bg-cyan-500/[0.06]',
+                              isPending &&
+                                'bg-cyan-500/20',
+                              !occupied &&
+                                !isPending &&
+                                'hover:bg-white/[0.04]'
                             )}
                           >
                             {/* wire */}
@@ -892,10 +1224,17 @@ export default function CircuitBuilderPage() {
                   {/* hint */}
                   <p className="mt-3 text-xs text-slate-500">
                     Click a cell to place{' '}
-                    <span style={{ color: selectedInfo.color }} className="font-semibold">
+                    <span
+                      style={{
+                        color: selectedInfo.color,
+                      }}
+                      className="font-semibold"
+                    >
                       {selectedInfo.name}
                     </span>
-                    . {selectedInfo.isMultiQubit && 'Click control first, then target.'}{' '}
+                    .{' '}
+                    {selectedInfo.isMultiQubit &&
+                      'Click control first, then target.'}{' '}
                     Click a placed gate to remove it.
                   </p>
                 </div>
@@ -909,21 +1248,33 @@ export default function CircuitBuilderPage() {
                 <Card className="border-rose-500/30 bg-rose-500/[0.05] backdrop-blur-xl xl:col-span-2">
                   <CardContent className="flex items-start gap-3 p-4">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+
                     <div>
-                      <p className="text-sm font-medium text-rose-300">Backend Error</p>
-                      <p className="mt-1 text-xs text-slate-400">{simError}</p>
-                      <p className="mt-1 text-xs text-slate-500">Showing local simulation results as fallback.</p>
+                      <p className="text-sm font-medium text-rose-300">
+                        Backend Error
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        {simError}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Showing local simulation results as fallback.
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
               )}
+
               {/* State vector */}
               <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                    <Info className="h-4 w-4 text-cyan-400" /> State Vector
+                    <Info className="h-4 w-4 text-cyan-400" />
+                    State Vector
                   </CardTitle>
                 </CardHeader>
+
                 <CardContent>
                   {!simResult ? (
                     <EmptyHint text="Run the simulator to see the quantum state vector." />
@@ -942,19 +1293,30 @@ export default function CircuitBuilderPage() {
                             <span className="font-mono text-sm font-semibold text-cyan-300">
                               |{row.basis}⟩
                             </span>
+
                             <span className="font-mono text-xs text-slate-300">
                               {row.amplitude}
                             </span>
                           </div>
+
                           <div className="flex items-center gap-2">
                             <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500"
-                                style={{ width: `${Math.min(100, row.probability * 100)}%` }}
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    row.probability * 100
+                                  )}%`,
+                                }}
                               />
                             </div>
+
                             <span className="w-14 text-right font-mono text-xs tabular-nums text-slate-400">
-                              {(row.probability * 100).toFixed(2)}%
+                              {(
+                                row.probability * 100
+                              ).toFixed(2)}
+                              %
                             </span>
                           </div>
                         </div>
@@ -968,39 +1330,63 @@ export default function CircuitBuilderPage() {
               <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                    <Zap className="h-4 w-4 text-cyan-400" /> Measurement Histogram
+                    <Zap className="h-4 w-4 text-cyan-400" />
+                    Measurement Histogram
                   </CardTitle>
                 </CardHeader>
+
                 <CardContent>
                   {!simResult ? (
                     <EmptyHint text="Run the simulator to see measurement outcomes (1024 shots)." />
                   ) : simResult.histogram.length === 0 ? (
-                    <p className="text-xs text-slate-500">No measurement outcomes.</p>
+                    <p className="text-xs text-slate-500">
+                      No measurement outcomes.
+                    </p>
                   ) : (
                     <div className="space-y-2">
-                      {simResult.histogram.slice(0, 12).map((h) => (
-                        <div key={h.state} className="flex items-center gap-3">
-                          <span className="w-16 font-mono text-xs font-semibold text-cyan-300">
-                            |{h.state}⟩
-                          </span>
-                          <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-white/5">
-                            <div
-                              className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-cyan-500/70 to-indigo-500/70 pr-2 transition-all"
-                              style={{ width: `${(h.probability / maxProb) * 100}%` }}
-                            >
-                              <span className="font-mono text-[10px] text-white/90">
-                                {h.count}
-                              </span>
+                      {simResult.histogram
+                        .slice(0, 12)
+                        .map((h) => (
+                          <div
+                            key={h.state}
+                            className="flex items-center gap-3"
+                          >
+                            <span className="w-16 font-mono text-xs font-semibold text-cyan-300">
+                              |{h.state}⟩
+                            </span>
+
+                            <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-white/5">
+                              <div
+                                className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-cyan-500/70 to-indigo-500/70 pr-2 transition-all"
+                                style={{
+                                  width: `${
+                                    (h.probability /
+                                      maxProb) *
+                                    100
+                                  }%`,
+                                }}
+                              >
+                                <span className="font-mono text-[10px] text-white/90">
+                                  {h.count}
+                                </span>
+                              </div>
                             </div>
+
+                            <span className="w-12 text-right font-mono text-xs tabular-nums text-slate-400">
+                              {(
+                                h.probability * 100
+                              ).toFixed(1)}
+                              %
+                            </span>
                           </div>
-                          <span className="w-12 text-right font-mono text-xs tabular-nums text-slate-400">
-                            {(h.probability * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+
                       {simResult.histogram.length > 12 && (
                         <p className="pt-1 text-center text-[10px] text-slate-600">
-                          +{simResult.histogram.length - 12} more outcomes
+                          +
+                          {simResult.histogram.length -
+                            12}{' '}
+                          more outcomes
                         </p>
                       )}
                     </div>
@@ -1012,25 +1398,41 @@ export default function CircuitBuilderPage() {
               <Card className="border-white/10 bg-white/[0.03] backdrop-blur-xl xl:col-span-2">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-sm text-slate-200">
-                    <AlertTriangle className="h-4 w-4 text-cyan-400" /> Circuit Analysis
+                    <AlertTriangle className="h-4 w-4 text-cyan-400" />
+                    Circuit Analysis
+
                     <span className="ml-2 flex gap-2 text-[10px] font-normal">
                       {errorCount > 0 && (
-                        <Badge color="rose">{errorCount} error{errorCount > 1 ? 's' : ''}</Badge>
+                        <Badge color="rose">
+                          {errorCount} error
+                          {errorCount > 1 ? 's' : ''}
+                        </Badge>
                       )}
+
                       {warnCount > 0 && (
-                        <Badge color="amber">{warnCount} warning{warnCount > 1 ? 's' : ''}</Badge>
+                        <Badge color="amber">
+                          {warnCount} warning
+                          {warnCount > 1 ? 's' : ''}
+                        </Badge>
                       )}
+
                       {optCount > 0 && (
-                        <Badge color="cyan">{optCount} optimization{optCount > 1 ? 's' : ''}</Badge>
+                        <Badge color="cyan">
+                          {optCount} optimization
+                          {optCount > 1 ? 's' : ''}
+                        </Badge>
                       )}
+
                       {findings.length === 0 && (
                         <Badge color="emerald">
-                          <CheckCircle2 className="mr-1 h-3 w-3" /> No issues
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          No issues
                         </Badge>
                       )}
                     </span>
                   </CardTitle>
                 </CardHeader>
+
                 <CardContent>
                   {findings.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-3 text-sm text-emerald-300">
@@ -1043,6 +1445,7 @@ export default function CircuitBuilderPage() {
                       {findings.map((f, i) => {
                         const s = SEVERITY_STYLE[f.severity]
                         const Icon = s.Icon
+
                         return (
                           <div
                             key={i}
@@ -1052,21 +1455,40 @@ export default function CircuitBuilderPage() {
                               s.border
                             )}
                           >
-                            <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', s.color)} />
+                            <Icon
+                              className={cn(
+                                'mt-0.5 h-4 w-4 shrink-0',
+                                s.color
+                              )}
+                            />
+
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className={cn('text-[10px] font-bold uppercase tracking-wider', s.color)}>
+                                <span
+                                  className={cn(
+                                    'text-[10px] font-bold uppercase tracking-wider',
+                                    s.color
+                                  )}
+                                >
                                   {s.label}
                                 </span>
+
                                 <span className="text-sm font-semibold text-slate-100">
                                   {f.title}
                                 </span>
                               </div>
+
                               <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
                                 {f.description}
                               </p>
+
                               {f.suggestion && (
-                                <p className={cn('mt-1 text-xs', s.color)}>
+                                <p
+                                  className={cn(
+                                    'mt-1 text-xs',
+                                    s.color
+                                  )}
+                                >
                                   → {f.suggestion}
                                 </p>
                               )}
@@ -1084,12 +1506,18 @@ export default function CircuitBuilderPage() {
             <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
               <span>
                 Need a refresher?{' '}
-                <Link to="/learn" className="text-cyan-400 hover:text-cyan-300">
+                <Link
+                  to="/learn"
+                  className="text-cyan-400 hover:text-cyan-300"
+                >
                   Open the lessons
                 </Link>
                 .
               </span>
-              <span>Q-loop Circuit Builder · local state-vector simulation</span>
+
+              <span>
+                Q-loop Circuit Builder · local state-vector simulation
+              </span>
             </div>
           </main>
         </div>
@@ -1118,53 +1546,102 @@ function GateChip({
   const info = GATE_INFO[gate.type]
 
   const partnerQubits: number[] = []
+
   if (gate.type === 'SWAP') {
-    if (gate.qubit === qubit && gate.targetQubit !== undefined)
+    if (
+      gate.qubit === qubit &&
+      gate.targetQubit !== undefined
+    ) {
       partnerQubits.push(gate.targetQubit)
-    else if (gate.targetQubit === qubit) partnerQubits.push(gate.qubit)
+    } else if (gate.targetQubit === qubit) {
+      partnerQubits.push(gate.qubit)
+    }
   } else if (gate.type === 'TOFFOLI') {
     if (gate.controlQubit === qubit) {
-      if (gate.control2Qubit !== undefined) partnerQubits.push(gate.control2Qubit)
-      if (gate.targetQubit !== undefined) partnerQubits.push(gate.targetQubit)
+      if (gate.control2Qubit !== undefined) {
+        partnerQubits.push(gate.control2Qubit)
+      }
+
+      if (gate.targetQubit !== undefined) {
+        partnerQubits.push(gate.targetQubit)
+      }
     } else if (gate.control2Qubit === qubit) {
-      if (gate.targetQubit !== undefined) partnerQubits.push(gate.targetQubit)
+      if (gate.targetQubit !== undefined) {
+        partnerQubits.push(gate.targetQubit)
+      }
     } else if (gate.targetQubit === qubit) {
-      if (gate.controlQubit !== undefined) partnerQubits.push(gate.controlQubit)
-      if (gate.control2Qubit !== undefined) partnerQubits.push(gate.control2Qubit)
+      if (gate.controlQubit !== undefined) {
+        partnerQubits.push(gate.controlQubit)
+      }
+
+      if (gate.control2Qubit !== undefined) {
+        partnerQubits.push(gate.control2Qubit)
+      }
     }
   } else {
-    // controlled two-qubit
-    if (gate.controlQubit === qubit && gate.targetQubit !== undefined)
+    // Controlled two-qubit gate.
+    if (
+      gate.controlQubit === qubit &&
+      gate.targetQubit !== undefined
+    ) {
       partnerQubits.push(gate.targetQubit)
-    else if (gate.targetQubit === qubit && gate.controlQubit !== undefined)
+    } else if (
+      gate.targetQubit === qubit &&
+      gate.controlQubit !== undefined
+    ) {
       partnerQubits.push(gate.controlQubit)
+    }
   }
 
   const isControl =
-    gate.controlQubit === qubit || gate.control2Qubit === qubit
+    gate.controlQubit === qubit ||
+    gate.control2Qubit === qubit
+
   const isTarget = gate.targetQubit === qubit
   const isSwap = gate.type === 'SWAP'
 
+  const isConditional =
+    gate.condition_bit !== undefined
+
   return (
     <div className="relative z-10 flex h-full w-full items-center justify-center">
-      {/* vertical connector to partners in the same column */}
+      {/* vertical connector to partners */}
       {partnerQubits.map((p) => {
         const distance = Math.abs(p - qubit)
         const direction = p > qubit ? 1 : -1
+
         return (
           <div
             key={p}
             className="absolute left-1/2 w-px -translate-x-1/2 bg-white/25"
             style={{
-              top: direction > 0 ? '50%' : undefined,
-              bottom: direction < 0 ? '50%' : undefined,
+              top:
+                direction > 0
+                  ? '50%'
+                  : undefined,
+              bottom:
+                direction < 0
+                  ? '50%'
+                  : undefined,
               height: `${distance * 56}px`,
             }}
           />
         )
       })}
 
-      {/* the gate chip itself */}
+      {/* Conditional marker */}
+      {isConditional && (
+        <div
+          className="absolute -right-1 -top-1 z-20 flex h-4 min-w-4 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/20 px-1 text-[8px] font-bold text-amber-200"
+          title={`Conditional: c[${gate.condition_bit}] = ${
+            gate.condition_value ?? 1
+          }`}
+        >
+          c{gate.condition_bit}
+        </div>
+      )}
+
+      {/* Gate chip */}
       <div
         className="relative flex h-9 w-9 items-center justify-center rounded-md border text-sm font-bold shadow-md transition-transform group-hover:scale-105"
         style={{
@@ -1173,25 +1650,51 @@ function GateChip({
           borderColor: `${info.color}66`,
           boxShadow: `0 0 10px ${info.color}33`,
         }}
-        title={`${info.name} @ q[${qubit}], col ${column}`}
+        title={
+          isConditional
+            ? `${info.name} @ q[${qubit}], col ${column} — if c[${gate.condition_bit}] = ${
+                gate.condition_value ?? 1
+              }`
+            : `${info.name} @ q[${qubit}], col ${column}`
+        }
       >
         {isControl ? (
-          // control dot
           <span
             className="absolute h-2.5 w-2.5 rounded-full"
-            style={{ background: info.color }}
+            style={{
+              background: info.color,
+            }}
           />
-        ) : isTarget && (gate.type === 'CX' || gate.type === 'TOFFOLI') ? (
-          // target ⊕
-          <span className="relative flex h-7 w-7 items-center justify-center rounded-full border-2"
-            style={{ borderColor: info.color }}
+        ) : isTarget &&
+          (gate.type === 'CX' ||
+            gate.type === 'TOFFOLI') ? (
+          <span
+            className="relative flex h-7 w-7 items-center justify-center rounded-full border-2"
+            style={{
+              borderColor: info.color,
+            }}
           >
-            <span className="absolute h-px w-4" style={{ background: info.color }} />
-            <span className="absolute h-4 w-px" style={{ background: info.color }} />
+            <span
+              className="absolute h-px w-4"
+              style={{
+                background: info.color,
+              }}
+            />
+
+            <span
+              className="absolute h-4 w-px"
+              style={{
+                background: info.color,
+              }}
+            />
           </span>
         ) : isSwap ? (
-          // swap ×
-          <span className="relative text-lg leading-none" style={{ color: info.color }}>
+          <span
+            className="relative text-lg leading-none"
+            style={{
+              color: info.color,
+            }}
+          >
             ×
           </span>
         ) : (
@@ -1213,8 +1716,10 @@ function Badge({
     rose: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
     amber: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
     cyan: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
-    emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    emerald:
+      'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
   }
+
   return (
     <span
       className={cn(
@@ -1230,7 +1735,9 @@ function Badge({
 function EmptyHint({ text }: { text: string }) {
   return (
     <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-white/10 bg-black/20">
-      <p className="px-6 text-center text-xs text-slate-500">{text}</p>
+      <p className="px-6 text-center text-xs text-slate-500">
+        {text}
+      </p>
     </div>
   )
 }

@@ -166,6 +166,33 @@ class CirqBackend(QuantumBackend):
                     "gate_indices": [i],
                 })
 
+            condition_bit = op.get("condition_bit")
+            condition_value = op.get("condition_value")
+
+            if condition_bit is not None and condition_bit < 0:
+                findings.append({
+                    "severity": "error",
+                    "type": "invalid_condition_bit",
+                    "message": (
+                        f"Operation {i + 1} ({gate}): "
+                        f"condition bit {condition_bit} cannot be negative."
+                    ),
+                    "suggestion": "Use a non-negative classical bit index.",
+                    "gate_indices": [i],
+                })
+
+            if condition_value is not None and condition_value not in (0, 1):
+                findings.append({
+                    "severity": "error",
+                    "type": "invalid_condition_value",
+                    "message": (
+                        f"Operation {i + 1} ({gate}): "
+                        f"condition value {condition_value} must be 0 or 1."
+                    ),
+                    "suggestion": "Use condition_value 0 or 1.",
+                    "gate_indices": [i],
+                })
+
         if (
             not any(
                 op.get("gate", "").upper() in MEASURE_GATES
@@ -213,9 +240,51 @@ class CirqBackend(QuantumBackend):
             qubits = cirq.LineQubit.range(n)
             circuit = cirq.Circuit()
 
-            measurement_targets = []
+            measurement_keys: Dict[int, str] = {}
+            measurement_order: List[int] = []
 
-            for op in ops:
+            def add_condition(operation, condition_bit, condition_value):
+                if condition_bit is None:
+                    return operation
+
+                if condition_bit < 0:
+                    raise ValueError(
+                        f"condition_bit must be >= 0, got {condition_bit}"
+                    )
+
+                if condition_value not in (0, 1, None):
+                    raise ValueError(
+                        f"condition_value must be 0 or 1, got {condition_value}"
+                    )
+
+                key = measurement_keys.get(condition_bit)
+
+                if key is None:
+                    raise ValueError(
+                        f"condition_bit {condition_bit} has no preceding measurement"
+                    )
+
+                expected = 1 if condition_value is None else condition_value
+
+                controlled = operation.with_classical_controls(key)
+
+                if expected == 1:
+                    return controlled
+
+                # Cirq's classical control represents "key is non-zero".
+                # For condition_value == 0, invert the classical predicate
+                # using a temporary classical expression when supported.
+                try:
+                    return operation.with_classical_controls(
+                        cirq.KeyCondition(key, value=0)
+                    )
+                except Exception:
+                    raise ValueError(
+                        "Cirq adapter currently supports condition_value=1 "
+                        "for classical controls."
+                    )
+
+            for op_index, op in enumerate(ops):
                 gate = op.get("gate", "").upper()
                 tgt = op.get("target", 0)
                 ctrl = op.get("control")
@@ -224,113 +293,126 @@ class CirqBackend(QuantumBackend):
 
                 q = qubits[tgt]
 
+                condition_bit = op.get("condition_bit")
+                condition_value = op.get("condition_value", 1)
+
+                if gate in MEASURE_GATES:
+                    key = f"m{len(measurement_order)}"
+
+                    circuit.append(
+                        cirq.measure(
+                            q,
+                            key=key,
+                        )
+                    )
+
+                    measurement_keys[len(measurement_order)] = key
+                    measurement_order.append(tgt)
+
+                    continue
+
+                operation = None
+
                 if gate == "H":
-                    circuit.append(cirq.H(q))
+                    operation = cirq.H(q)
 
                 elif gate == "X":
-                    circuit.append(cirq.X(q))
+                    operation = cirq.X(q)
 
                 elif gate == "Y":
-                    circuit.append(cirq.Y(q))
+                    operation = cirq.Y(q)
 
                 elif gate == "Z":
-                    circuit.append(cirq.Z(q))
+                    operation = cirq.Z(q)
 
                 elif gate == "S":
-                    circuit.append(cirq.S(q))
+                    operation = cirq.S(q)
 
-                elif gate == "SDG":
-                    circuit.append(cirq.S(q) ** -1)
-
-                elif gate in ("SDAGGER",):
-                    circuit.append(cirq.S(q) ** -1)
+                elif gate in ("SDG", "SDAGGER"):
+                    operation = cirq.S(q) ** -1
 
                 elif gate == "T":
-                    circuit.append(cirq.T(q))
+                    operation = cirq.T(q)
 
-                elif gate == "TDG":
-                    circuit.append(cirq.T(q) ** -1)
-
-                elif gate in ("TDAGGER",):
-                    circuit.append(cirq.T(q) ** -1)
+                elif gate in ("TDG", "TDAGGER"):
+                    operation = cirq.T(q) ** -1
 
                 elif gate == "RX":
-                    circuit.append(cirq.rx(param)(q))
+                    operation = cirq.rx(param)(q)
 
                 elif gate == "RY":
-                    circuit.append(cirq.ry(param)(q))
+                    operation = cirq.ry(param)(q)
 
                 elif gate == "RZ":
-                    circuit.append(cirq.rz(param)(q))
+                    operation = cirq.rz(param)(q)
 
                 elif gate == "P":
-                    circuit.append(cirq.ZPowGate(exponent=param / math.pi)(q))
+                    operation = cirq.ZPowGate(
+                        exponent=param / math.pi
+                    )(q)
 
                 elif gate == "U":
-                    circuit.append(
-                        cirq.MatrixGate(
-                            cirq.unitary(
-                                cirq.PhasedXPowGate(
-                                    exponent=param / math.pi
-                                )
-                            )
-                        )(q)
-                    )
+                    operation = cirq.PhasedXPowGate(
+                        exponent=param / math.pi
+                    )(q)
 
                 elif gate in ("CX", "CNOT"):
                     if ctrl is not None:
-                        circuit.append(cirq.CNOT(qubits[ctrl], q))
+                        operation = cirq.CNOT(
+                            qubits[ctrl],
+                            q,
+                        )
 
                 elif gate == "CZ":
                     if ctrl is not None:
-                        circuit.append(cirq.CZ(qubits[ctrl], q))
+                        operation = cirq.CZ(
+                            qubits[ctrl],
+                            q,
+                        )
 
                 elif gate == "CY":
                     if ctrl is not None:
-                        circuit.append(
-                            cirq.ControlledGate(cirq.Y)(qubits[ctrl], q)
-                        )
+                        operation = cirq.ControlledGate(
+                            cirq.Y
+                        )(qubits[ctrl], q)
 
                 elif gate == "CH":
                     if ctrl is not None:
-                        circuit.append(
-                            cirq.ControlledGate(cirq.H)(qubits[ctrl], q)
-                        )
+                        operation = cirq.ControlledGate(
+                            cirq.H
+                        )(qubits[ctrl], q)
 
                 elif gate == "SWAP":
                     if ctrl is not None:
-                        circuit.append(cirq.SWAP(qubits[ctrl], q))
+                        operation = cirq.SWAP(
+                            qubits[ctrl],
+                            q,
+                        )
 
                 elif gate in ("TOFFOLI", "CCX"):
                     if ctrl is not None and ctrl2 is not None:
-                        circuit.append(
-                            cirq.TOFFOLI(
-                                qubits[ctrl],
-                                qubits[ctrl2],
-                                q,
-                            )
+                        operation = cirq.TOFFOLI(
+                            qubits[ctrl],
+                            qubits[ctrl2],
+                            q,
                         )
 
-                elif gate in MEASURE_GATES:
-                    measurement_targets.append(tgt)
+                if operation is not None:
+                    operation = add_condition(
+                        operation,
+                        condition_bit,
+                        condition_value,
+                    )
 
-            has_measurements = len(measurement_targets) > 0
+                    circuit.append(operation)
 
             simulator = cirq.Simulator()
 
+            has_measurements = bool(measurement_order)
+
             if has_measurements:
-                measured_circuit = circuit.copy()
-
-                for index, target in enumerate(measurement_targets):
-                    measured_circuit.append(
-                        cirq.measure(
-                            qubits[target],
-                            key=f"m{index}",
-                        )
-                    )
-
                 result = simulator.run(
-                    measured_circuit,
+                    circuit,
                     repetitions=shots,
                 )
 
@@ -338,8 +420,8 @@ class CirqBackend(QuantumBackend):
 
                 for row in result.data.itertuples(index=False):
                     bits = "".join(
-                        str(getattr(row, f"m{i}"))
-                        for i in range(len(measurement_targets))
+                        str(getattr(row, measurement_keys[i]))
+                        for i in range(len(measurement_order))
                     )
 
                     counts[bits] = counts.get(bits, 0) + 1
@@ -386,7 +468,9 @@ class CirqBackend(QuantumBackend):
                 statevector=statevector_data,
                 execution_time_ms=elapsed_ms,
                 circuit_depth=len(circuit),
-                gate_count=sum(1 for _ in circuit.all_operations()),
+                gate_count=sum(
+                    1 for _ in circuit.all_operations()
+                ),
             )
 
         except Exception as e:
