@@ -615,6 +615,14 @@ export default function CircuitBuilderPage() {
                         return (
                           <button
                             key={g}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/x-qloop-gate', g)
+                              e.dataTransfer.effectAllowed = 'copy'
+                              setSelectedGate(g)
+                              setPendingControl(null)
+                              setPendingControl2(null)
+                            }}
                             onClick={() => {
                               setSelectedGate(g)
                               setPendingControl(null)
@@ -836,6 +844,19 @@ export default function CircuitBuilderPage() {
                           <div
                             key={c}
                             onClick={() => onCellClick(q, c)}
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = 'copy'
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const gate = e.dataTransfer.getData('application/x-qloop-gate') as GateType
+                              if (!gate || !GATE_INFO[gate]) return
+                              setSelectedGate(gate)
+                              setPendingControl(null)
+                              setPendingControl2(null)
+                              onCellClick(q, c)
+                            }}
                             className={cn(
                               'group relative flex h-14 w-16 cursor-pointer items-center justify-center transition-all',
                               'border-r border-t border-white/[0.04]',

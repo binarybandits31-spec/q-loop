@@ -478,25 +478,53 @@ export default function SimulatorPage() {
 
               {/* controls */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-cyan-500/10 bg-slate-950/60 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-cyan-300/70">Shots</span>
-                  <div className="flex overflow-hidden rounded-md border border-cyan-500/20">
-                    {SHOT_OPTIONS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setShots(s)}
-                        className={cn(
-                          'px-3 py-1.5 font-mono text-xs transition-colors',
-                          shots === s
-                            ? 'bg-cyan-500/20 text-cyan-50'
-                            : 'bg-transparent text-cyan-100/60 hover:bg-cyan-500/10 hover:text-cyan-100'
-                        )}
-                      >
-                        {s.toLocaleString()}
-                      </button>
-                    ))}
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* quantum backend/framework selector */}
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="quantum-framework"
+                      className="text-xs font-mono uppercase tracking-wider text-cyan-300/70"
+                    >
+                      Backend
+                    </label>
+                    <select
+                      id="quantum-framework"
+                      value={framework}
+                      onChange={(e) =>
+                        setFramework(e.target.value as 'qiskit_aer' | 'pennylane' | 'cirq')
+                      }
+                      disabled={isRunning}
+                      className="h-8 rounded-md border border-cyan-500/20 bg-slate-900 px-2.5 font-mono text-xs text-cyan-50 outline-none transition-colors hover:border-cyan-400/50 focus:border-cyan-400/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="qiskit_aer">Qiskit Aer</option>
+                      <option value="pennylane">PennyLane</option>
+                      <option value="cirq">Cirq</option>
+                    </select>
+                  </div>
+
+                  {/* shots selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono uppercase tracking-wider text-cyan-300/70">Shots</span>
+                    <div className="flex overflow-hidden rounded-md border border-cyan-500/20">
+                      {SHOT_OPTIONS.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setShots(s)}
+                          disabled={isRunning}
+                          className={cn(
+                            'px-3 py-1.5 font-mono text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                            shots === s
+                              ? 'bg-cyan-500/20 text-cyan-50'
+                              : 'bg-transparent text-cyan-100/60 hover:bg-cyan-500/10 hover:text-cyan-100'
+                          )}
+                        >
+                          {s.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
+
                 <Button
                   onClick={handleRun}
                   disabled={isRunning}
