@@ -188,7 +188,7 @@ export default function LandingPage() {
           </span>
 
           <h1 className="mt-6 max-w-4xl text-4xl font-extrabold leading-[1.1] tracking-tight text-white text-glow sm:text-5xl md:text-6xl lg:text-7xl animate-fade-in-up">
-            Master Quantum Computing
+            Master Quantum Algorithms
             <span className="block bg-gradient-to-r from-cyan-300 via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
               From Theory to Practice
             </span>
