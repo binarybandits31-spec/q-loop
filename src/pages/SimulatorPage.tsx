@@ -258,7 +258,7 @@ export default function SimulatorPage() {
   const [code, setCode] = useState<string>(EXAMPLES['Bell State']);
   const [shots, setShots] = useState<number>(1024);
   const [result, setResult] = useState<SimulationResult | null>(null);
-  const [framework, setFramework] = useState<'qiskit_aer' | 'pennylane' | 'cirq'>('qiskit_aer');
+  const [framework, setFramework] = useState<'qiskit_aer' | 'pennylane' | 'cirq' | 'qbraid'>('qiskit_aer');
   const [parseError, setParseError] = useState<string | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [circuitName, setCircuitName] = useState<string>('Bell');
@@ -491,7 +491,7 @@ export default function SimulatorPage() {
                       id="quantum-framework"
                       value={framework}
                       onChange={(e) =>
-                        setFramework(e.target.value as 'qiskit_aer' | 'pennylane' | 'cirq')
+                        setFramework(e.target.value as 'qiskit_aer' | 'pennylane' | 'cirq' | 'qbraid')
                       }
                       disabled={isRunning}
                       className="h-8 rounded-md border border-cyan-500/20 bg-slate-900 px-2.5 font-mono text-xs text-cyan-50 outline-none transition-colors hover:border-cyan-400/50 focus:border-cyan-400/60 disabled:cursor-not-allowed disabled:opacity-50"
@@ -499,6 +499,7 @@ export default function SimulatorPage() {
                       <option value="qiskit_aer">Qiskit Aer</option>
                       <option value="pennylane">PennyLane</option>
                       <option value="cirq">Cirq</option>
+                        <option value="qbraid">qBraid</option>
                     </select>
                   </div>
 
@@ -681,3 +682,4 @@ export default function SimulatorPage() {
     </div>
   );
 }
+

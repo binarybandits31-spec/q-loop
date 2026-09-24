@@ -1,6 +1,6 @@
 const API_URL = import.meta.env.VITE_API_URL as string || 'http://localhost:8000'
 
-export type QuantumFramework = 'qiskit_aer' | 'pennylane' | 'cirq'
+export type QuantumFramework = 'qiskit_aer' | 'pennylane' | 'cirq' | 'qbraid'
 
 export interface ExecuteRequest {
   qubits: number
