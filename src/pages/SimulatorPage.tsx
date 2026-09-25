@@ -264,11 +264,13 @@ export default function SimulatorPage() {
   const [circuitName, setCircuitName] = useState<string>('Bell');
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [stateVectorSource, setStateVectorSource] = useState<'backend' | 'local' | 'unavailable' | null>(null);
 
   const handleRun = useCallback(async () => {
     setIsRunning(true);
     setParseError(null);
     setBackendError(null);
+    setStateVectorSource(null);
     try {
       const parsed = parseCircuit(code);
       if ('error' in parsed) {
@@ -301,12 +303,7 @@ export default function SimulatorPage() {
           setBackendError(res.error || 'Execution failed');
           // Fall back to local simulation
           const sim = simulateCircuit(parsed.gates, parsed.numQubits, shots);
-          const backendStateVector = res.statevector
-  ? {
-      amplitudes: res.statevector.map(([re, im]) => ({ re, im })),
-      numQubits: parsed.numQubits,
-    }
-  : null;
+          setStateVectorSource('local');
           setResult(sim);
         } else {
           // Map backend response to frontend SimulationResult shape
@@ -319,6 +316,19 @@ export default function SimulatorPage() {
       }
     : null;
 
+  // qBraid currently returns measurement counts but no statevector.
+  // Never present the locally calculated statevector as if it came from qBraid.
+  const hasBackendStateVector = backendStateVector !== null;
+  const shouldShowLocalStateVector = framework !== 'qbraid';
+
+  setStateVectorSource(
+    hasBackendStateVector
+      ? 'backend'
+      : shouldShowLocalStateVector
+        ? 'local'
+        : 'unavailable'
+  );
+
   const histogram = Object.entries(res.counts)
     .map(([state, count]) => ({
       state,
@@ -329,6 +339,8 @@ export default function SimulatorPage() {
     .sort((a, b) => b.count - a.count);
 
   setResult({
+    // qBraid has no statevector in its current result API, so do not
+    // silently substitute the local statevector for a qBraid result.
     stateVector: backendStateVector ?? local.stateVector,
     probabilities: local.probabilities,
     measurements: [
@@ -346,6 +358,7 @@ export default function SimulatorPage() {
         setBackendError(err instanceof Error ? err.message : 'Failed to connect to backend');
         // Fall back to local simulation
         const sim = simulateCircuit(parsed.gates, parsed.numQubits, shots);
+        setStateVectorSource('local');
         setResult(sim);
       }
     } catch (err) {
@@ -360,6 +373,7 @@ export default function SimulatorPage() {
     setCode(EXAMPLES[key]);
     setParseError(null);
     setResult(null);
+    setStateVectorSource(null);
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -397,8 +411,8 @@ export default function SimulatorPage() {
               Quantum Circuit <span className="text-cyan-400">Code Simulator</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-cyan-100/60">
-              Write quantum circuits in a simple DSL, run them on a state-vector simulator, and inspect
-              the resulting state and measurement distribution.
+              Write quantum circuits in a simple DSL, run them on the selected quantum backend, and inspect
+              the resulting state information and measurement distribution.
             </p>
           </div>
         </header>
@@ -582,9 +596,23 @@ export default function SimulatorPage() {
                     State Vector
                   </CardTitle>
                   {result && (
-                    <span className="ml-auto rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cyan-300">
-                      {circuitName} · {result.stateVector.numQubits} qubits
-                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        {circuitName} · {result.stateVector.numQubits} qubits
+                      </span>
+
+                      {stateVectorSource === 'local' && framework !== 'qbraid' && (
+                        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                          Local visualization
+                        </span>
+                      )}
+
+                      {stateVectorSource === 'unavailable' && framework === 'qbraid' && (
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                          Not returned by qBraid
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardHeader>
@@ -593,6 +621,15 @@ export default function SimulatorPage() {
                   <p className="py-8 text-center font-mono text-xs text-cyan-100/40">
                     Run a circuit to view the state vector.
                   </p>
+                ) : stateVectorSource === 'unavailable' && framework === 'qbraid' ? (
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-950/20 px-4 py-6 text-center">
+                    <p className="font-mono text-sm text-amber-300">
+                      State vector unavailable from qBraid
+                    </p>
+                    <p className="mx-auto mt-2 max-w-xl font-mono text-xs leading-5 text-amber-100/60">
+                      qBraid returned the measurement counts successfully, but its current API response does not include the state vector. The measurement distribution below is the actual qBraid result.
+                    </p>
+                  </div>
                 ) : (
                   <div className="space-y-1.5">
                     <div className="grid grid-cols-[5rem_1fr_5rem] gap-2 px-1 pb-1 text-[10px] font-mono uppercase tracking-wider text-cyan-300/50">
