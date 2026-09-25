@@ -57,7 +57,7 @@ class CircuitRequest(BaseModel):
     @field_validator("framework")
     @classmethod
     def valid_framework(cls, v: str) -> str:
-        allowed = {"qiskit_aer", "pennylane", "cirq"}
+        allowed = {"qiskit_aer", "pennylane", "cirq", "qbraid"}
         if v not in allowed:
             raise ValueError(f"Framework must be one of {allowed}")
         return v

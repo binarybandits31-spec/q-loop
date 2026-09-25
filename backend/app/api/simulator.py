@@ -139,6 +139,16 @@ async def list_backends():
             "is_operational": False,
             "is_default": False,
         },
+        {
+            "id": "qbraid",
+            "name": "qBraid",
+            "description": (
+                "Cloud quantum computing platform with "
+                "remote simulator access."
+            ),
+            "is_operational": False,
+            "is_default": False,
+        },
     ]
 
     # Verify Qiskit Aer availability
@@ -178,6 +188,17 @@ async def list_backends():
     except Exception as e:
         backends_info[2]["note"] = str(e)
 
+    # Verify qBraid availability
+    try:
+        from ..services.quantum.qbraid_adapter import QBraidBackend
+
+        backends_info[3]["is_operational"] = (
+            QBraidBackend().is_available
+        )
+
+    except Exception as e:
+        backends_info[3]["note"] = str(e)
+
     return {
         "backends": backends_info
-    }   
+    }

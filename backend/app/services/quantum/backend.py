@@ -10,12 +10,12 @@ from typing import Dict, List, Optional
 
 @dataclass
 class ExecutionResult:
-    status: str  # success | error
+    status: str
     framework: str
     shots: int
     counts: Dict[str, int] = field(default_factory=dict)
     probabilities: Dict[str, float] = field(default_factory=dict)
-    statevector: Optional[List[List[float]]] = None  # [[re, im], ...]
+    statevector: Optional[List[List[float]]] = None
     execution_time_ms: float = 0.0
     circuit_depth: Optional[int] = None
     gate_count: int = 0
@@ -39,18 +39,7 @@ class QuantumBackend(ABC):
 
     @abstractmethod
     def validate(self, circuit_data: dict) -> List[dict]:
-        """
-        Validate a circuit JSON.
-
-        Returns a list of findings dicts:
-          {
-              severity,
-              type,
-              message,
-              suggestion,
-              gate_indices
-          }
-        """
+        """Validate a circuit JSON."""
         ...
 
     @abstractmethod
@@ -81,11 +70,13 @@ def get_backend(framework: str) -> QuantumBackend:
     from .qiskit_adapter import QiskitAerBackend
     from .pennylane_adapter import PennyLaneBackend
     from .cirq_adapter import CirqBackend
+    from .qbraid_adapter import QBraidBackend
 
     backends: Dict[str, QuantumBackend] = {
         "qiskit_aer": QiskitAerBackend(),
         "pennylane": PennyLaneBackend(),
         "cirq": CirqBackend(),
+        "qbraid": QBraidBackend(),
     }
 
     backend = backends.get(framework)
