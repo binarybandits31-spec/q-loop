@@ -12,11 +12,10 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 
 type Tab = 'signin' | 'signup';
-type Role = 'student' | 'instructor';
+type Role = 'student';
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -34,7 +33,7 @@ export default function AuthPage() {
   const [displayName, setDisplayName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
-  const [role, setRole] = useState<Role>('student');
+  const [role] = useState<Role>('student');
 
   function resetError() {
     if (error) setError(null);
@@ -44,12 +43,19 @@ export default function AuthPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error: signInError } = await signIn(signInEmail, signInPassword);
+
+    const { error: signInError } = await signIn(
+      signInEmail,
+      signInPassword,
+    );
+
     setLoading(false);
+
     if (signInError) {
       setError(signInError);
       return;
     }
+
     navigate('/dashboard');
   }
 
@@ -57,24 +63,32 @@ export default function AuthPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
     const { error: signUpError } = await signUp(
       signUpEmail,
       signUpPassword,
       displayName,
       role,
     );
+
     setLoading(false);
+
     if (signUpError) {
       setError(signUpError);
       return;
     }
+
     navigate('/dashboard');
   }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#05070d] text-slate-100">
       {/* Ambient backgrounds */}
-      <div className="pointer-events-none fixed inset-0 grid-bg opacity-40" aria-hidden />
+      <div
+        className="pointer-events-none fixed inset-0 grid-bg opacity-40"
+        aria-hidden
+      />
+
       <div
         className="pointer-events-none fixed inset-0"
         aria-hidden
@@ -86,6 +100,7 @@ export default function AuthPage() {
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-6 py-16">
         <div className="w-full max-w-md animate-fade-in-up">
+
           {/* Brand */}
           <div className="mb-8 flex flex-col items-center text-center">
             <div className="animate-float">
@@ -94,13 +109,15 @@ export default function AuthPage() {
                 strokeWidth={1.25}
               />
             </div>
+
             <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">
               Q-loop · Quantum Learning Platform
             </span>
           </div>
 
           <Card className="glass relative overflow-hidden border-cyan-400/15 bg-white/[0.03] backdrop-blur-xl">
-            {/* glow accent */}
+
+            {/* Glow accent */}
             <div
               className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl"
               aria-hidden
@@ -110,6 +127,7 @@ export default function AuthPage() {
               <CardTitle className="text-2xl font-bold tracking-tight text-white">
                 {tab === 'signin' ? 'Welcome Back' : 'Join Q-loop'}
               </CardTitle>
+
               <CardDescription className="text-sm text-slate-400">
                 {tab === 'signin'
                   ? 'Sign in to continue your quantum journey.'
@@ -118,6 +136,7 @@ export default function AuthPage() {
             </CardHeader>
 
             <CardContent className="relative">
+
               {/* Tab switcher */}
               <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.03] p-1">
                 <button
@@ -135,6 +154,7 @@ export default function AuthPage() {
                 >
                   Sign In
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -166,12 +186,18 @@ export default function AuthPage() {
               {/* Sign In form */}
               {tab === 'signin' && (
                 <form onSubmit={handleSignIn} className="space-y-4">
+
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email" className="text-slate-200">
+                    <Label
+                      htmlFor="signin-email"
+                      className="text-slate-200"
+                    >
                       Email
                     </Label>
+
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+
                       <Input
                         id="signin-email"
                         type="email"
@@ -186,11 +212,16 @@ export default function AuthPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password" className="text-slate-200">
+                    <Label
+                      htmlFor="signin-password"
+                      className="text-slate-200"
+                    >
                       Password
                     </Label>
+
                     <div className="relative">
                       <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+
                       <Input
                         id="signin-password"
                         type="password"
@@ -217,12 +248,19 @@ export default function AuthPage() {
               {/* Sign Up form */}
               {tab === 'signup' && (
                 <form onSubmit={handleSignUp} className="space-y-4">
+
+                  {/* Display Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-slate-200">
+                    <Label
+                      htmlFor="signup-name"
+                      className="text-slate-200"
+                    >
                       Display Name
                     </Label>
+
                     <div className="relative">
                       <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+
                       <Input
                         id="signup-name"
                         type="text"
@@ -236,12 +274,18 @@ export default function AuthPage() {
                     </div>
                   </div>
 
+                  {/* Email */}
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-slate-200">
+                    <Label
+                      htmlFor="signup-email"
+                      className="text-slate-200"
+                    >
                       Email
                     </Label>
+
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+
                       <Input
                         id="signup-email"
                         type="email"
@@ -255,12 +299,18 @@ export default function AuthPage() {
                     </div>
                   </div>
 
+                  {/* Password */}
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-slate-200">
+                    <Label
+                      htmlFor="signup-password"
+                      className="text-slate-200"
+                    >
                       Password
                     </Label>
+
                     <div className="relative">
                       <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+
                       <Input
                         id="signup-password"
                         type="password"
@@ -274,42 +324,21 @@ export default function AuthPage() {
                     </div>
                   </div>
 
+                  {/* Role */}
                   <div className="space-y-2">
-                    <Label className="text-slate-200">Role</Label>
-                    <RadioGroup
-                      value={role}
-                      onValueChange={(v) => setRole(v as Role)}
-                      className="grid grid-cols-2 gap-3"
-                    >
-                      <Label
-                        htmlFor="role-student"
-                        className={cn(
-                          'flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all',
-                          role === 'student'
-                            ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-100 quantum-glow'
-                            : 'border-cyan-400/15 bg-white/[0.02] text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/[0.04]',
-                        )}
-                      >
-                        <RadioGroupItem id="role-student" value="student" />
-                        <GraduationCap className="h-4 w-4 text-cyan-400" />
-                        <span className="text-sm font-medium">Student</span>
-                      </Label>
-                      <Label
-                        htmlFor="role-instructor"
-                        className={cn(
-                          'flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all',
-                          role === 'instructor'
-                            ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-100 quantum-glow'
-                            : 'border-cyan-400/15 bg-white/[0.02] text-slate-300 hover:border-cyan-400/30 hover:bg-cyan-400/[0.04]',
-                        )}
-                      >
-                        <RadioGroupItem id="role-instructor" value="instructor" />
-                        <User className="h-4 w-4 text-cyan-400" />
-                        <span className="text-sm font-medium">Instructor</span>
-                      </Label>
-                    </RadioGroup>
+                    <Label className="text-slate-200">
+                      Role
+                    </Label>
+
+                    <div className="flex items-center gap-3 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 py-3 text-cyan-100 quantum-glow">
+                      <GraduationCap className="h-4 w-4 text-cyan-400" />
+                      <span className="text-sm font-medium">
+                        Student
+                      </span>
+                    </div>
                   </div>
 
+                  {/* Create Account */}
                   <Button
                     type="submit"
                     disabled={loading}

@@ -1,6 +1,6 @@
 # Q-Loop: Setup Guide
 
-Q-Loop is a quantum-computing learning/simulation platform.
+Q-Loop is a quantum-algorithm learning/simulation platform.
 
 - **Frontend:** React + TypeScript + Vite
 - **Backend:** Python + FastAPI + Uvicorn

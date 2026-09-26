@@ -12,7 +12,7 @@ export function Footer() {
               <span className="text-lg font-bold">Q<span className="text-primary">-</span>loop</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              An AI-based interactive quantum algorithm learning platform. Master quantum computing through structured learning, circuit design, simulation, and visualization.
+              An AI-based interactive quantum algorithm learning platform. Master quantum algorithms through structured learning, circuit design, simulation, and visualization.
             </p>
             <p className="text-xs text-muted-foreground/60 mt-4">SIH26140 — Egreen Quanta — Smart Education</p>
           </div>

@@ -616,6 +616,7 @@ function CodingChallengeView({
   const handleRun = () => {
     setRunning(true)
     setTimeout(() => {
+      console.log('CODE SENT TO VALIDATOR:', JSON.stringify(code))
       const res = challenge.validator(code)
       setResult(res)
       setRunning(false)
