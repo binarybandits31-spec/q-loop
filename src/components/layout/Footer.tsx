@@ -14,7 +14,6 @@ export function Footer() {
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
               An AI-based interactive quantum algorithm learning platform. Master quantum algorithms through structured learning, circuit design, simulation, and visualization.
             </p>
-            <p className="text-xs text-muted-foreground/60 mt-4">SIH26140 — Egreen Quanta — Smart Education</p>
           </div>
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground">Platform</h4>
@@ -36,7 +35,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-10 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground/60">© 2026 Q-loop. Built for Smart India Hackathon.</p>
+          <p className="text-xs text-muted-foreground/60">© 2026 Q-loop.</p>
         </div>
       </div>
     </footer>
