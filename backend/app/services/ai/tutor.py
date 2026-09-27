@@ -116,6 +116,29 @@ class AITutor:
     def _fallback_explanation(self, question: str) -> str:
         question_lower = question.lower()
 
+        # More detailed Bell-state fallback.
+        if "bell" in question_lower:
+            return (
+                "A Bell state can be created from the initial two-qubit state |00⟩.\n\n"
+                "Step 1 — Initial state:\n"
+                "|ψ₀⟩ = |00⟩\n\n"
+                "Step 2 — Apply a Hadamard gate to q0:\n"
+                "H|0⟩ = (|0⟩ + |1⟩)/√2\n\n"
+                "Therefore:\n"
+                "|ψ₁⟩ = (|00⟩ + |10⟩)/√2\n\n"
+                "Step 3 — Apply CNOT(q0, q1):\n"
+                "The CNOT flips q1 only when q0 is |1⟩.\n"
+                "|00⟩ → |00⟩\n"
+                "|10⟩ → |11⟩\n\n"
+                "Therefore the final state is:\n"
+                "|ψ₂⟩ = (|00⟩ + |11⟩)/√2\n\n"
+                "Step 4 — Measurement:\n"
+                "The two possible outcomes are |00⟩ and |11⟩, each with probability 1/2 "
+                "for an ideal measurement.\n\n"
+                "The states |01⟩ and |10⟩ do not appear because they have zero amplitude "
+                "in this Bell state."
+            )
+
         for keyword, explanation in KNOWLEDGE_BASE.items():
             if keyword in question_lower:
                 return explanation
@@ -134,13 +157,17 @@ class AITutor:
 
         system_prompt = """You are Q-Loop, an AI tutor for quantum computing.
 
-Explain concepts clearly and accurately for the learner's level.
+Explain concepts clearly, accurately, and at the learner's level.
 
 Rules:
-- Use simple explanations first.
-- Use quantum notation when useful.
-- Give small examples.
-- Do not invent experimental results.
+- Start with a simple explanation, then add the technical explanation when useful.
+- Follow the user's requested level of detail. If the user asks for "step by step", provide an actual numbered step-by-step derivation.
+- When a question involves a quantum circuit, explicitly show the quantum state before and after each important gate using Dirac notation such as |0⟩, |1⟩, |00⟩, |11⟩, and superposition expressions.
+- For Bell-state questions, show the initial state, the effect of H, the resulting superposition, the effect of CNOT, the final Bell state, and explain why the measurement outcomes occur.
+- When explaining probabilities, derive them from the amplitudes when appropriate.
+- Distinguish clearly between theoretical quantum states and actual simulator measurement results.
+- Never invent experimental or simulation results.
+- Use small examples when they improve understanding.
 - If the user asks for Qiskit code, provide actual executable Qiskit Python code.
 """
 

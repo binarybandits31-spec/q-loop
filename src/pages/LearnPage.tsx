@@ -29,9 +29,9 @@ export default function LearnPage() {
             <BookOpen className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium text-primary">Learning Hub</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3">Quantum Computing Curriculum</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-3">Quantum Algorithm Curriculum</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            Progress through 13 structured modules — from mathematical foundations to research frontiers. Each lesson includes interactive content, quizzes, and circuit examples.
+            Progress through structured quantum algorithm modules — from mathematical foundations to quantum algorithm implementation and analysis. Each lesson includes interactive content, quizzes, and circuit examples.
           </p>
         </div>
 
@@ -96,3 +96,6 @@ export default function LearnPage() {
     </div>
   )
 }
+
+
+
