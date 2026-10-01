@@ -1,5 +1,7 @@
 import './App.css'
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
+import { QLoopCircuitProvider } from '@/context/QLoopCircuitContext'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import LandingPage from '@/pages/LandingPage'
@@ -17,10 +19,28 @@ import DashboardPage from '@/pages/DashboardPage'
 import InstructorPage from '@/pages/InstructorPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'instant',
+    })
+  }, [pathname])
+
+  return null
+}
+
 function App() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <QLoopCircuitProvider>
+      <div className="min-h-screen bg-background text-foreground">
       <Navbar />
+
+      <ScrollToTop />
+
       <main className="pt-16">
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -39,8 +59,10 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
+
       <Footer />
     </div>
+  </QLoopCircuitProvider>
   )
 }
 

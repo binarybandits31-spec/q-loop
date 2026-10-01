@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CircuitBoard,
@@ -233,12 +234,32 @@ function makePreset(name: PresetName): { numQubits: number; gates: PlacedGate[] 
 /* ------------------------------------------------------------------ */
 
 export default function CircuitBuilderPage() {
+  const {
+  setNumQubits: setSharedNumQubits,
+  setGates: setSharedGates,
+  setSimulationResult: setSharedSimulationResult,
+} = useQLoopCircuit()
+
   const [numQubits, setNumQubits] = useState(2)
   const [gates, setGates] = useState<PlacedGate[]>([])
   const [selectedGate, setSelectedGate] = useState<GateType>('H')
   const [simResult, setSimResult] = useState<SimulationResult | null>(null)
   const [simulating, setSimulating] = useState(false)
-  const [simError, setSimError] = useState<string | null>(null)
+  const [simError, setSimError] = useState<string | null>(null) 
+  useEffect(() => {
+    setSharedGates(gates)
+  }, [gates, setSharedGates])
+
+  useEffect(() => {
+    setSharedNumQubits(numQubits)
+  }, [numQubits, setSharedNumQubits])
+
+  useEffect(() => {
+    setSharedSimulationResult(simResult)
+  }, [simResult, setSharedSimulationResult])  
+  useEffect(() => {
+    setSharedGates(gates)
+  }, [gates, setSharedGates])
   const [pendingControl, setPendingControl] = useState<{
     qubit: number
     column: number

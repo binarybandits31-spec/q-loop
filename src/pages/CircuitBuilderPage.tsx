@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+﻿import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CircuitBoard,
@@ -323,14 +324,14 @@ function makePreset(
       }
 
     case "Grover's (2-qubit)": {
-      // 2-qubit Grover: H⊗H, oracle (mark |11>), diffusion.
+      // 2-qubit Grover: HâŠ—H, oracle (mark |11>), diffusion.
       return {
         numQubits: 2,
         gates: [
           mk('H', 0, 0),
           mk('H', 1, 0),
 
-          // Oracle: mark |11⟩ via CZ
+          // Oracle: mark |11âŸ© via CZ
           mk('CZ', 0, 1, {
             controlQubit: 0,
             targetQubit: 1,
@@ -367,6 +368,11 @@ function makePreset(
 /* ------------------------------------------------------------------ */
 
 export default function CircuitBuilderPage() {
+  const {
+    setNumQubits: setSharedNumQubits,
+    setGates: setSharedGates,
+    setSimulationResult: setSharedSimulationResult,
+  } = useQLoopCircuit()
   const [numQubits, setNumQubits] = useState(2)
   const [gates, setGates] = useState<PlacedGate[]>([])
   const [selectedGate, setSelectedGate] = useState<GateType>('H')
@@ -374,6 +380,18 @@ export default function CircuitBuilderPage() {
     useState<SimulationResult | null>(null)
   const [simulating, setSimulating] = useState(false)
   const [simError, setSimError] = useState<string | null>(null)
+
+useEffect(() => {
+  setSharedGates(gates)
+}, [gates, setSharedGates])
+
+useEffect(() => {
+  setSharedNumQubits(numQubits)
+}, [numQubits, setSharedNumQubits])
+
+useEffect(() => {
+  setSharedSimulationResult(simResult)
+}, [simResult, setSharedSimulationResult])
 
   const [pendingControl, setPendingControl] = useState<{
     qubit: number
@@ -789,7 +807,7 @@ export default function CircuitBuilderPage() {
               <CircuitBoard className="h-6 w-6" />
 
               <span className="text-sm font-medium uppercase tracking-widest">
-                Q-loop · Circuit Builder
+                Q-loop Â· Circuit Builder
               </span>
             </div>
 
@@ -818,7 +836,7 @@ export default function CircuitBuilderPage() {
                 <Play className="mr-2 h-4 w-4" />
               )}
 
-              {simulating ? 'Running…' : 'Simulate'}
+              {simulating ? 'Runningâ€¦' : 'Simulate'}
             </Button>
 
             <Button
@@ -887,7 +905,7 @@ export default function CircuitBuilderPage() {
                               setPendingControl(null)
                               setPendingControl2(null)
                             }}
-                            title={`${info.name} — ${info.description}`}
+                            title={`${info.name} â€” ${info.description}`}
                             className={cn(
                               'relative flex h-10 items-center justify-center rounded-lg border text-sm font-bold transition-all',
                               active
@@ -944,10 +962,10 @@ export default function CircuitBuilderPage() {
                     <p className="text-xs text-slate-400">
                       {selectedInfo.isMultiQubit
                         ? selectedGate === 'TOFFOLI'
-                          ? '3-qubit · click 3 qubits'
-                          : '2-qubit · click 2 qubits'
+                          ? '3-qubit Â· click 3 qubits'
+                          : '2-qubit Â· click 2 qubits'
                         : selectedInfo.hasParameter
-                        ? 'parametric · θ = π/2'
+                        ? 'parametric Â· Î¸ = Ï€/2'
                         : 'single-qubit'}
                     </p>
                   </div>
@@ -961,11 +979,11 @@ export default function CircuitBuilderPage() {
                   <p className="mt-3 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-200">
                     {selectedGate === 'TOFFOLI' &&
                     !pendingControl2
-                      ? `Control 1 set on q[${pendingControl.qubit}] — pick control 2`
+                      ? `Control 1 set on q[${pendingControl.qubit}] â€” pick control 2`
                       : selectedGate === 'TOFFOLI' &&
                         pendingControl2
-                      ? `Controls on q[${pendingControl.qubit}] & q[${pendingControl2.qubit}] — pick target`
-                      : `Control set on q[${pendingControl.qubit}] — pick target`}
+                      ? `Controls on q[${pendingControl.qubit}] & q[${pendingControl2.qubit}] â€” pick target`
+                      : `Control set on q[${pendingControl.qubit}] â€” pick target`}
                   </p>
                 )}
               </CardContent>
@@ -1040,7 +1058,7 @@ export default function CircuitBuilderPage() {
                   </div>
 
                   <span className="text-xs text-slate-500">
-                    ({MIN_QUBITS}–{MAX_QUBITS})
+                    ({MIN_QUBITS}â€“{MAX_QUBITS})
                   </span>
                 </div>
 
@@ -1130,7 +1148,7 @@ export default function CircuitBuilderPage() {
                         </span>
 
                         <span className="text-[10px] text-slate-600">
-                          |0⟩
+                          |0âŸ©
                         </span>
                       </div>
 
@@ -1212,7 +1230,7 @@ export default function CircuitBuilderPage() {
 
                             {isPending && (
                               <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-md border border-cyan-400/60 bg-cyan-500/30 text-xs font-bold text-cyan-100">
-                                •
+                                â€¢
                               </div>
                             )}
                           </div>
@@ -1291,7 +1309,7 @@ export default function CircuitBuilderPage() {
                         >
                           <div className="flex items-center gap-3">
                             <span className="font-mono text-sm font-semibold text-cyan-300">
-                              |{row.basis}⟩
+                              |{row.basis}âŸ©
                             </span>
 
                             <span className="font-mono text-xs text-slate-300">
@@ -1352,7 +1370,7 @@ export default function CircuitBuilderPage() {
                             className="flex items-center gap-3"
                           >
                             <span className="w-16 font-mono text-xs font-semibold text-cyan-300">
-                              |{h.state}⟩
+                              |{h.state}âŸ©
                             </span>
 
                             <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-white/5">
@@ -1437,7 +1455,7 @@ export default function CircuitBuilderPage() {
                   {findings.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-3 text-sm text-emerald-300">
                       <CheckCircle2 className="h-4 w-4" />
-                      Circuit looks clean — no errors, warnings, or optimization
+                      Circuit looks clean â€” no errors, warnings, or optimization
                       suggestions.
                     </div>
                   ) : (
@@ -1489,7 +1507,7 @@ export default function CircuitBuilderPage() {
                                     s.color
                                   )}
                                 >
-                                  → {f.suggestion}
+                                  â†’ {f.suggestion}
                                 </p>
                               )}
                             </div>
@@ -1516,7 +1534,7 @@ export default function CircuitBuilderPage() {
               </span>
 
               <span>
-                Q-loop Circuit Builder · local state-vector simulation
+                Q-loop Circuit Builder Â· local state-vector simulation
               </span>
             </div>
           </main>
@@ -1652,7 +1670,7 @@ function GateChip({
         }}
         title={
           isConditional
-            ? `${info.name} @ q[${qubit}], col ${column} — if c[${gate.condition_bit}] = ${
+            ? `${info.name} @ q[${qubit}], col ${column} â€” if c[${gate.condition_bit}] = ${
                 gate.condition_value ?? 1
               }`
             : `${info.name} @ q[${qubit}], col ${column}`
@@ -1695,7 +1713,7 @@ function GateChip({
               color: info.color,
             }}
           >
-            ×
+            Ã—
           </span>
         ) : (
           <span>{info.symbol}</span>
@@ -1741,3 +1759,5 @@ function EmptyHint({ text }: { text: string }) {
     </div>
   )
 }
+
+

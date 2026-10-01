@@ -215,18 +215,16 @@ export default function AIAssistantPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+useEffect(() => {
+  const chatContainer = messagesEndRef.current?.parentElement
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
+  if (chatContainer) {
+    chatContainer.scrollTo({
+      top: chatContainer.scrollHeight,
       behavior: 'smooth',
     })
-  }, [messages, isTyping])
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  // ─── Send message ─────────────────────────────────────────────────
+  }
+}, [messages, isTyping])
 
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim()
@@ -252,9 +250,13 @@ export default function AIAssistantPage() {
         )
 
       // Select the correct backend endpoint.
+      // Local development uses the FastAPI server running on port 8000.
+      const API_BASE_URL = 'http://127.0.0.1:8000'
+
       const endpoint = wantsCode
-        ? 'https://q-loop.onrender.com/api/ai/generate-code'
-        : 'https://q-loop.onrender.com/api/ai/explain'
+        ? `${API_BASE_URL}/api/ai/generate-code`
+        : `${API_BASE_URL}/api/ai/explain`
+
       const action = wantsCode ? 'generate_code' : 'explain'
 
       const response = await fetch(endpoint, {
