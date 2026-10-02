@@ -74,6 +74,30 @@ class CircuitSimulationTool:
         qubits = circuit["qubits"]
         operations = circuit["operations"]
 
+        # Accept both backend-style operations (gate/target/control)
+        # and the frontend CircuitGate shape (type/qubit/targetQubit/controlQubit).
+        normalized_operations = []
+        for operation in operations:
+            if not isinstance(operation, dict):
+                normalized_operations.append(operation)
+                continue
+
+            normalized = dict(operation)
+            if "gate" not in normalized and "type" in normalized:
+                normalized["gate"] = normalized["type"]
+            if "target" not in normalized and "qubit" in normalized:
+                normalized["target"] = normalized["qubit"]
+            if "target" not in normalized and "targetQubit" in normalized:
+                normalized["target"] = normalized["targetQubit"]
+            if "control" not in normalized and "controlQubit" in normalized:
+                normalized["control"] = normalized["controlQubit"]
+            if "control2" not in normalized and "control2Qubit" in normalized:
+                normalized["control2"] = normalized["control2Qubit"]
+
+            normalized_operations.append(normalized)
+
+        operations = normalized_operations
+
         if not isinstance(qubits, int) or qubits < 1:
             return {
                 "status": "error",
