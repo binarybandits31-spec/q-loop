@@ -102,6 +102,16 @@ const ACHIEVEMENT_ICONS: Record<string, typeof BookOpen> = {
 }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DASHBOARD_REQUEST_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms = DASHBOARD_REQUEST_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error('Dashboard data request timed out')), ms)
+    }),
+  ])
+}
 
 export default function DashboardPage() {
   const { user, profile, loading: authLoading } = useAuth()
@@ -121,14 +131,14 @@ export default function DashboardPage() {
     ;(async () => {
       setLoading(true)
       try {
-        const [lpRes, qaRes, caRes, mhRes, rcRes, acRes] = await Promise.all([
+        const [lpRes, qaRes, caRes, mhRes, rcRes, acRes] = await withTimeout(Promise.all([
           supabase.from('lesson_progress').select('*').eq('user_id', user.id),
           supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
           supabase.from('circuit_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
           supabase.from('mistake_history').select('*').eq('user_id', user.id),
           supabase.from('recommendations').select('*').eq('user_id', user.id).order('priority', { ascending: true }).limit(5),
           supabase.from('achievements').select('*').eq('user_id', user.id).order('earned_at', { ascending: false }).limit(6),
-        ])
+        ]))
 
         if (cancelled) return
 
