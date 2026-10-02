@@ -52,6 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    const loadingFailsafe = window.setTimeout(() => {
+      if (mounted) {
+        console.error('Auth loading failsafe triggered')
+        setLoading(false)
+      }
+    }, AUTH_REQUEST_TIMEOUT_MS + 2000)
+
     async function initializeAuth() {
       try {
         const {
@@ -101,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
+      window.clearTimeout(loadingFailsafe)
       subscription.unsubscribe()
     }
   }, [])
