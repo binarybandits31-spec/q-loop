@@ -1,3 +1,4 @@
+import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
 import { useState, useRef, useEffect } from 'react'
 import {
   Brain,
@@ -200,6 +201,11 @@ const MOCK_CONTEXT: ContextInfo = {
 // ─── Component ────────────────────────────────────────────────────────
 
 export default function AIAssistantPage() {
+    const {
+    numQubits,
+    operations,
+    simulationResult,
+  } = useQLoopCircuit()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -269,6 +275,11 @@ useEffect(() => {
     question: content,
     context: {
       learner_level: 'beginner',
+      circuit: {
+        qubits: numQubits,
+        operations,
+      },
+      simulation_result: simulationResult,
     },
   }),
 })

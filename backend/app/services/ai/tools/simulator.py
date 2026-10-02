@@ -179,11 +179,15 @@ class CircuitSimulationTool:
             "circuit_depth": result.circuit_depth,
             "gate_count": result.gate_count,
             "error": result.error,
-            "validation_findings": [
-                finding.to_dict()
-                for finding in findings
-            ],
-        }
+
+            # Preserve the original circuit so the AI Tutor
+            # can explain the actual gates that were simulated.
+            "circuit": circuit_data,
+    "validation_findings": [
+        finding.to_dict()
+        for finding in findings
+    ],
+}
 
 
 simulate_circuit = CircuitSimulationTool()

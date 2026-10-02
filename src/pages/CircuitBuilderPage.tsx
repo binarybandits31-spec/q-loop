@@ -657,18 +657,31 @@ useEffect(() => {
         )
 
         setSimResult({
-          stateVector: local.stateVector,
-          probabilities: local.probabilities,
-          measurements: [
-            {
-              outcome: '',
-              probability: 1,
-              counts: res.counts,
-            },
-          ],
-          measuredQubits: new Set<number>(),
-          histogram,
-        })
+  // Existing frontend simulation data
+  stateVector: local.stateVector,
+  probabilities: local.probabilities,
+  measurements: [
+    {
+      outcome: '',
+      probability: 1,
+      counts: res.counts,
+    },
+  ],
+  measuredQubits: new Set<number>(),
+  histogram,
+
+  // Backend simulation metadata
+  status: res.status,
+  framework: res.framework,
+  shots: res.shots,
+  execution_time_ms: res.execution_time_ms,
+  circuit_depth: res.circuit_depth,
+  gate_count: res.gate_count,
+  error: res.error,
+
+  // Actual backend measurement counts
+  counts: res.counts,
+})
       }
     } catch (err) {
       setSimError(

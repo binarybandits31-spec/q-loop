@@ -44,6 +44,18 @@ export interface SimulationResult {
     count: number
     probability: number
   }[]
+
+  // Backend simulation metadata
+  status?: string
+  framework?: string
+  shots?: number
+  execution_time_ms?: number
+  circuit_depth?: number | null
+  gate_count?: number
+  error?: string | null
+
+  // Raw measurement counts from the backend
+  counts?: Record<string, number>
 }
 
 export function initStateVector(numQubits: number): StateVector {
