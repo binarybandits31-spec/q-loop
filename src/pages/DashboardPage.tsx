@@ -104,13 +104,34 @@ const ACHIEVEMENT_ICONS: Record<string, typeof BookOpen> = {
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DASHBOARD_REQUEST_TIMEOUT_MS = 8000
 
-function withTimeout<T>(promise: Promise<T>, ms = DASHBOARD_REQUEST_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error('Dashboard data request timed out')), ms)
-    }),
-  ])
+function withTimeout<T>(
+  promise: PromiseLike<T>,
+  ms = DASHBOARD_REQUEST_TIMEOUT_MS
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Dashboard data request timed out'))
+    }, ms)
+
+    Promise.resolve(promise).then(
+      (value) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
 }
 
 export default function DashboardPage() {
