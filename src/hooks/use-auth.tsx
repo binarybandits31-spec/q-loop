@@ -32,6 +32,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const AUTH_REQUEST_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms = AUTH_REQUEST_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error('Supabase request timed out')), ms)
+    }),
+  ])
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -42,21 +53,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     async function initializeAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession())
 
-      if (!mounted) return
+        if (!mounted) return
 
       setSession(session)
       setUser(session?.user ?? null)
 
       console.log('AUTH USER:', session?.user?.user_metadata)
 
-      if (session?.user) {
-        await loadProfile(session.user.id)
-      } else {
-        setLoading(false)
+        if (session?.user) {
+          await loadProfile(session.user.id)
+        } else {
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error)
+        if (mounted) {
+          setSession(null)
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+        }
       }
     }
 
@@ -85,22 +106,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
+    try {
+      const { data, error } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle()
+      )
 
-    if (error) {
+      if (error) {
+        console.error('Failed to load profile:', error)
+        setProfile(null)
+      } else if (data) {
+        setProfile(data as Profile)
+      } else {
+        setProfile(null)
+      }
+
+      setLoading(false)
+    } catch (error) {
       console.error('Failed to load profile:', error)
       setProfile(null)
-    } else if (data) {
-      setProfile(data as Profile)
-    } else {
-      setProfile(null)
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   async function refreshProfile() {
