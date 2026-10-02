@@ -34,13 +34,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const AUTH_REQUEST_TIMEOUT_MS = 8000
 
-function withTimeout<T>(promise: Promise<T>, ms = AUTH_REQUEST_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error('Supabase request timed out')), ms)
-    }),
-  ])
+function withTimeout<T>(
+  promise: PromiseLike<T>,
+  ms = AUTH_REQUEST_TIMEOUT_MS
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Supabase request timed out'))
+    }, ms)
+
+    Promise.resolve(promise).then(
+      (value) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -67,10 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted) return
 
-      setSession(session)
-      setUser(session?.user ?? null)
+        setSession(session)
+        setUser(session?.user ?? null)
 
-      console.log('AUTH USER:', session?.user?.user_metadata)
+        console.log('AUTH USER:', session?.user?.user_metadata)
 
         if (session?.user) {
           await loadProfile(session.user.id)
