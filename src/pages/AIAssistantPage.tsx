@@ -257,7 +257,8 @@ useEffect(() => {
 
       // Select the correct backend endpoint.
       // Local development uses the FastAPI server running on port 8000.
-      const API_BASE_URL = 'http://127.0.0.1:8000'
+      const API_BASE_URL =
+        import.meta.env.VITE_API_URL?.trim() || 'https://q-loop.onrender.com'
 
       const endpoint = wantsCode
         ? `${API_BASE_URL}/api/ai/generate-code`
