@@ -81,7 +81,128 @@ export const MODULES: Module[] = [
           { heading: "Programming activity", body: "• Implement these circuits in Qiskit, Cirq, PennyLane, or another framework:\n• , measured 1,000 times.\n• .\n• .\n• A Bell-state circuit using and CNOT.\n• A circuit that compares the measurement distributions of and before and after a final Hadamard gate.\n• Glossary\n• Amplitude: A complex coefficient associated with a basis state. Its squared magnitude contributes to a measurement probability.\n• Bit: A classical information unit with value 0 or 1.\n• Decoherence: Loss of quantum coherence through unwanted interaction with the environment.\n• Entanglement: A nonseparable property of a joint quantum state.\n• Interference: The constructive or destructive combination of probability amplitudes.\n• Measurement: An operation that produces a classical result from a quantum state.\n• Qubit: The basic unit of quantum information.\n• Quantum gate: An operation on qubits, ideally represented by a unitary matrix.\n• Superposition: A linear combination of basis states.\n• Unitary operation: A reversible norm-preserving transformation satisfying .\n• References\n• [1]: https://quantum.cloud.ibm.com/learning/en/courses/basics-of-quantum-information \"IBM Quantum Learning: Basics of Quantum Information\"\n• [2]: https://qiskit.qotlabs.org/learning/courses/quantum-computing-in-practice \"IBM Quantum Learning: Quantum Computing in Practice\"\n• [3]: https://doi.org/10.1103/RevModPhys.68.1049 \"Quantum Computation and Quantum Information by Michael A. Nielsen and Isaac L. Chuang\"\n• [4]: https://theory.caltech.edu/~preskill/ph229/ \"John Preskill: Lecture Notes for Physics 229, Quantum Information and Computation\"\n• [5]: https://www.nist.gov/quantum-information-science \"National Institute of Standards and Technology: Quantum Information Science\"\n• [6]: https://doi.org/10.1103/PhysRevA.52.R2493 \"Quantum Mechanical Speed-Up of Database Search by Lov K. Grover\"\n• [7]: https://doi.org/10.1038/414883a \"Quantum Computing with Imperfect Devices by John Preskill\"\n• Author: Manus AI Module: Computational Fundamentals Chapter: Introduction to Quantum Computing", formula: "|0⟩→H|+⟩\n|0⟩→H→H|0⟩\n|0⟩→H→Z→H|1⟩\nH\n|+⟩\n|-⟩\nU^† U=I" },
           { heading: "References", body: "• https://quantum.cloud.ibm.com/learning/en/courses/basics-of-quantum-information \"IBM Quantum Learning: Basics of Quantum Information\"\n• https://qiskit.qotlabs.org/learning/courses/quantum-computing-in-practice \"IBM Quantum Learning: Quantum Computing in Practice\"\n• https://doi.org/10.1103/RevModPhys.68.1049 \"Quantum Computation and Quantum Information by Michael A. Nielsen and Isaac L. Chuang\"\n• https://theory.caltech.edu/~preskill/ph229/ \"John Preskill: Lecture Notes for Physics 229, Quantum Information and Computation\"\n• https://www.nist.gov/quantum-information-science \"National Institute of Standards and Technology: Quantum Information Science\"\n• https://doi.org/10.1103/PhysRevA.52.R2493 \"Quantum Mechanical Speed-Up of Database Search by Lov K. Grover\"\n• https://doi.org/10.1038/414883a \"Quantum Computing with Imperfect Devices by John Preskill\"" },
         ],
-        quiz: [],
+        quiz: [
+  {
+    id: "q1",
+    question: "What is a qubit?",
+    options: [
+      "A classical bit that stores only 0",
+      "A quantum bit that can exist in a superposition of basis states",
+      "A type of quantum gate",
+      "A measurement device"
+    ],
+    correctIndex: 1,
+    explanation: "A qubit is a quantum system whose state can be a superposition of the basis states |0⟩ and |1⟩."
+  },
+  {
+    id: "q2",
+    question: "What condition must the amplitudes of a normalized qubit satisfy?",
+    options: [
+      "Their sum must be zero",
+      "Both amplitudes must equal 1",
+      "The sum of their squared magnitudes must equal 1",
+      "Both amplitudes must be real"
+    ],
+    correctIndex: 2,
+    explanation: "Normalization requires |α|² + |β|² = 1."
+  },
+  {
+    id: "q3",
+    question: "What does the Hadamard gate do to the state |0⟩?",
+    options: [
+      "Leaves it unchanged",
+      "Produces an equal superposition of |0⟩ and |1⟩",
+      "Always produces |1⟩",
+      "Measures the qubit"
+    ],
+    correctIndex: 1,
+    explanation: "The Hadamard gate transforms |0⟩ into (|0⟩ + |1⟩)/√2."
+  },
+  {
+    id: "q4",
+    question: "According to the Born rule, how is a measurement probability calculated?",
+    options: [
+      "By squaring the magnitude of the probability amplitude",
+      "By adding all amplitudes without squaring",
+      "By counting the number of gates",
+      "By taking the inverse of the amplitude"
+    ],
+    correctIndex: 0,
+    explanation: "The probability of an outcome is the squared magnitude of its amplitude."
+  },
+  {
+    id: "q5",
+    question: "What is quantum interference?",
+    options: [
+      "A computer overheating",
+      "The addition of classical bits",
+      "The combining of probability amplitudes, which can reinforce or cancel",
+      "A method of measuring temperature"
+    ],
+    correctIndex: 2,
+    explanation: "Quantum amplitudes can interfere constructively or destructively, changing outcome probabilities."
+  },
+  {
+    id: "q6",
+    question: "What generally happens when a qubit is measured in the computational basis?",
+    options: [
+      "The result is always 0",
+      "The result is always 1",
+      "The qubit creates another qubit",
+      "The measurement returns 0 or 1 according to the state's probabilities"
+    ],
+    correctIndex: 3,
+    explanation: "Measurement produces a basis outcome probabilistically and leaves the state in the corresponding measured state in the ideal projective model."
+  },
+  {
+    id: "q7",
+    question: "What is quantum entanglement?",
+    options: [
+      "A relationship between quantum systems whose joint state cannot be described as a product of individual states",
+      "A classical data backup",
+      "A single-qubit measurement",
+      "A type of programming language"
+    ],
+    correctIndex: 0,
+    explanation: "Entangled systems have joint quantum states that cannot be factored into independent states for each subsystem."
+  },
+  {
+    id: "q8",
+    question: "What property must an ideal quantum gate's matrix satisfy?",
+    options: [
+      "It must contain only zeros",
+      "It must be unitary",
+      "It must be rectangular",
+      "Every entry must equal one"
+    ],
+    correctIndex: 1,
+    explanation: "Unitary operations preserve the normalization of quantum states."
+  },
+  {
+    id: "q9",
+    question: "What does a CNOT gate do?",
+    options: [
+      "Measures both qubits",
+      "Always flips both qubits",
+      "Flips the target qubit when the control qubit is |1⟩",
+      "Deletes the target qubit"
+    ],
+    correctIndex: 2,
+    explanation: "CNOT applies a NOT operation to the target only when the control is |1⟩."
+  },
+  {
+    id: "q10",
+    question: "What does quantum advantage mean?",
+    options: [
+      "Quantum computers are faster at every task",
+      "A quantum computer uses no energy",
+      "Every quantum algorithm gives the correct answer immediately",
+      "A quantum approach outperforms relevant classical approaches for a particular task"
+    ],
+    correctIndex: 3,
+    explanation: "Quantum advantage refers to a demonstrated benefit for a specific task, not universal superiority."
+  }
+],
       },
       {
         id: "module-1-chapter-02", moduleId: "module-1", title: "Qubits and Quantum States",
