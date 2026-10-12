@@ -75,10 +75,6 @@ export default function AssessmentPage() {
       state.answers[question.id] === question.correctIndex
   ).length
 
-  const allAnswered = questions.every(
-    (question) => state.answers[question.id] !== undefined
-  )
-
   const progress =
     questions.length > 0
       ? (questions.filter(
@@ -90,6 +86,19 @@ export default function AssessmentPage() {
 
   const scorePct =
     questions.length > 0 ? (score / questions.length) * 100 : 0
+    
+const attemptedQuestions = questions.filter(
+  (question) => state.answers[question.id] !== undefined
+)
+
+const unattemptedQuestions = questions.filter(
+  (question) => state.answers[question.id] === undefined
+)
+
+const incorrectCount = attemptedQuestions.filter(
+  (question) => state.answers[question.id] !== question.correctIndex
+).length
+
 
   const resetAssessment = (activeModule: string | null) => {
     setState({
@@ -237,6 +246,10 @@ export default function AssessmentPage() {
                               ...previous.answers,
                               [currentQ.id]: index,
                             },
+                            currentQuestion: Math.min(
+                              previous.currentQuestion + 1,
+                              questions.length - 1
+                            ),
                           }))
                         }
                         className={cn(
@@ -300,12 +313,16 @@ export default function AssessmentPage() {
                   onClick={() =>
                     setState((previous) => ({
                       ...previous,
-                      currentQuestion: previous.currentQuestion + 1,
+                      currentQuestion: Math.min(
+                        previous.currentQuestion + 1,
+                        questions.length - 1
+                      ),
                     }))
                   }
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  Next
+                  Skip
+                  <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
                 <Button
@@ -315,7 +332,6 @@ export default function AssessmentPage() {
                       submitted: true,
                     }))
                   }
-                  disabled={!allAnswered}
                   className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <CheckCircle2 className="h-4 w-4" />
@@ -323,6 +339,24 @@ export default function AssessmentPage() {
                 </Button>
               )}
             </div>
+
+            {state.currentQuestion < questions.length - 1 && (
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setState((previous) => ({
+                      ...previous,
+                      submitted: true,
+                    }))
+                  }
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Submit assessment now
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="space-y-6 animate-fade-in-up">
@@ -349,6 +383,58 @@ export default function AssessmentPage() {
               <h2 className="mb-2 text-2xl font-bold">
                 {score} / {questions.length}
               </h2>
+              
+<div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  <div className="rounded-lg border p-3">
+    <p className="text-xs text-muted-foreground">Total</p>
+    <p className="text-xl font-bold">{questions.length}</p>
+  </div>
+
+  <div className="rounded-lg border p-3">
+    <p className="text-xs text-muted-foreground">Attempted</p>
+    <p className="text-xl font-bold text-primary">
+      {attemptedQuestions.length}
+    </p>
+  </div>
+
+  <div className="rounded-lg border p-3">
+    <p className="text-xs text-muted-foreground">Correct</p>
+    <p className="text-xl font-bold text-success">{score}</p>
+  </div>
+
+  <div className="rounded-lg border p-3">
+    <p className="text-xs text-muted-foreground">Incorrect</p>
+    <p className="text-xl font-bold text-error">{incorrectCount}</p>
+  </div>
+</div>
+
+<div className="mb-6 space-y-3 text-left">
+  <div className="rounded-lg border p-3">
+    <p className="mb-2 text-sm font-semibold text-primary">
+      Attempted questions ({attemptedQuestions.length})
+    </p>
+    <p className="text-sm text-muted-foreground">
+      {attemptedQuestions.length > 0
+        ? attemptedQuestions
+            .map((question) => questions.indexOf(question) + 1)
+            .join(', ')
+        : 'None'}
+    </p>
+  </div>
+
+  <div className="rounded-lg border p-3">
+    <p className="mb-2 text-sm font-semibold text-muted-foreground">
+      Unattempted questions ({unattemptedQuestions.length})
+    </p>
+    <p className="text-sm text-muted-foreground">
+      {unattemptedQuestions.length > 0
+        ? unattemptedQuestions
+            .map((question) => questions.indexOf(question) + 1)
+            .join(', ')
+        : 'None'}
+    </p>
+  </div>
+</div>
 
               <p className="mb-6 text-muted-foreground">
                 {scorePct >= 80
