@@ -178,7 +178,7 @@ export default function LandingPage() {
             <div className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full bg-cyan-300 quantum-glow" />
           </div>
 
-          <div className="animate-float">
+          <div className="flex w-full justify-center">
             <Atom className="mx-auto h-16 w-16 text-cyan-400 quantum-glow" strokeWidth={1.25} />
           </div>
 

@@ -1,4 +1,4 @@
-﻿import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
+import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
 import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -849,7 +849,7 @@ useEffect(() => {
                 <Play className="mr-2 h-4 w-4" />
               )}
 
-              {simulating ? 'Runningâ€¦' : 'Simulate'}
+              {simulating ? 'Running…' : 'Simulate'}
             </Button>
 
             <Button
@@ -918,7 +918,7 @@ useEffect(() => {
                               setPendingControl(null)
                               setPendingControl2(null)
                             }}
-                            title={`${info.name} â€” ${info.description}`}
+                            title={`${info.name} - ${info.description}`}
                             className={cn(
                               'relative flex h-10 items-center justify-center rounded-lg border text-sm font-bold transition-all',
                               active
@@ -992,11 +992,11 @@ useEffect(() => {
                   <p className="mt-3 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-200">
                     {selectedGate === 'TOFFOLI' &&
                     !pendingControl2
-                      ? `Control 1 set on q[${pendingControl.qubit}] â€” pick control 2`
+                      ? `Control 1 set on q[${pendingControl.qubit}] - pick control 2`
                       : selectedGate === 'TOFFOLI' &&
                         pendingControl2
-                      ? `Controls on q[${pendingControl.qubit}] & q[${pendingControl2.qubit}] â€” pick target`
-                      : `Control set on q[${pendingControl.qubit}] â€” pick target`}
+                      ? `Controls on q[${pendingControl.qubit}] & q[${pendingControl2.qubit}] - pick target`
+                      : `Control set on q[${pendingControl.qubit}] - pick target`}
                   </p>
                 )}
               </CardContent>
@@ -1071,7 +1071,7 @@ useEffect(() => {
                   </div>
 
                   <span className="text-xs text-slate-500">
-                    ({MIN_QUBITS}â€“{MAX_QUBITS})
+                    ({MIN_QUBITS}–{MAX_QUBITS})
                   </span>
                 </div>
 
@@ -1243,7 +1243,7 @@ useEffect(() => {
 
                             {isPending && (
                               <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-md border border-cyan-400/60 bg-cyan-500/30 text-xs font-bold text-cyan-100">
-                                â€¢
+                                •
                               </div>
                             )}
                           </div>
@@ -1468,7 +1468,7 @@ useEffect(() => {
                   {findings.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-3 text-sm text-emerald-300">
                       <CheckCircle2 className="h-4 w-4" />
-                      Circuit looks clean â€” no errors, warnings, or optimization
+                      Circuit looks clean - no errors, warnings, or optimization
                       suggestions.
                     </div>
                   ) : (
@@ -1683,7 +1683,7 @@ function GateChip({
         }}
         title={
           isConditional
-            ? `${info.name} @ q[${qubit}], col ${column} â€” if c[${gate.condition_bit}] = ${
+            ? `${info.name} @ q[${qubit}], col ${column} - if c[${gate.condition_bit}] = ${
                 gate.condition_value ?? 1
               }`
             : `${info.name} @ q[${qubit}], col ${column}`
@@ -1726,7 +1726,7 @@ function GateChip({
               color: info.color,
             }}
           >
-            Ã—
+            ×
           </span>
         ) : (
           <span>{info.symbol}</span>
@@ -1772,5 +1772,3 @@ function EmptyHint({ text }: { text: string }) {
     </div>
   )
 }
-
-
