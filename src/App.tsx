@@ -1,3 +1,4 @@
+
 import './App.css'
 import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
@@ -34,35 +35,47 @@ function ScrollToTop() {
 }
 
 function App() {
+  const { pathname } = useLocation()
+
   return (
     <QLoopCircuitProvider>
-      <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <Navbar />
 
-      <ScrollToTop />
+        <ScrollToTop />
 
-      <main className="pt-16">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/learn" element={<LearnPage />} />
-          <Route path="/learn/:lessonId" element={<LessonDetailPage />} />
-          <Route path="/circuit" element={<CircuitBuilderPage />} />
-          <Route path="/code-lab" element={<CodeLabPage />} />
-          <Route path="/simulate" element={<SimulatorPage />} />
-          <Route path="/visualize" element={<VisualizerPage />} />
-          <Route path="/ai-assistant" element={<AIAssistantPage />} />
-          <Route path="/challenges" element={<ChallengesPage />} />
-          <Route path="/assess" element={<AssessmentPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/instructor" element={<InstructorPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </main>
+        <main className="pt-16 flex-1">
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/learn" element={<LearnPage />} />
+            <Route path="/learn/:lessonId" element={<LessonDetailPage />} />
+            <Route path="/circuit" element={<CircuitBuilderPage />} />
+            <Route path="/code-lab" element={<CodeLabPage />} />
+            <Route path="/simulate" element={<SimulatorPage />} />
+            <Route path="/visualize" element={<VisualizerPage />} />
+            <Route path="/ai-assistant" element={<AIAssistantPage />} />
+            <Route path="/challenges" element={<ChallengesPage />} />
+            <Route path="/assess" element={<AssessmentPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/instructor" element={<InstructorPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </main>
 
-      <Footer />
-    </div>
-  </QLoopCircuitProvider>
+        {pathname === '/' ? (
+          <Footer />
+        ) : (
+          <footer className="border-t border-border/40 mt-12">
+            <div className="mx-auto max-w-7xl px-6 py-5 text-center">
+              <p className="text-xs text-muted-foreground/60">
+                © 2026 Q-Loop. All rights reserved.
+              </p>
+            </div>
+          </footer>
+        )}
+      </div>
+    </QLoopCircuitProvider>
   )
 }
 
