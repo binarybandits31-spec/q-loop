@@ -34,35 +34,37 @@ function ScrollToTop() {
 }
 
 function App() {
+  const { pathname } = useLocation()
+
   return (
     <QLoopCircuitProvider>
       <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
+        <Navbar />
 
-      <ScrollToTop />
+        <ScrollToTop />
 
-      <main className="pt-16">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/learn" element={<LearnPage />} />
-          <Route path="/learn/:lessonId" element={<LessonDetailPage />} />
-          <Route path="/circuit" element={<CircuitBuilderPage />} />
-          <Route path="/code-lab" element={<CodeLabPage />} />
-          <Route path="/simulate" element={<SimulatorPage />} />
-          <Route path="/visualize" element={<VisualizerPage />} />
-          <Route path="/ai-assistant" element={<AIAssistantPage />} />
-          <Route path="/challenges" element={<ChallengesPage />} />
-          <Route path="/assess" element={<AssessmentPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/instructor" element={<InstructorPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </main>
+        <main className="pt-16">
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/learn" element={<LearnPage />} />
+            <Route path="/learn/:lessonId" element={<LessonDetailPage />} />
+            <Route path="/circuit" element={<CircuitBuilderPage />} />
+            <Route path="/code-lab" element={<CodeLabPage />} />
+            <Route path="/simulate" element={<SimulatorPage />} />
+            <Route path="/visualize" element={<VisualizerPage />} />
+            <Route path="/ai-assistant" element={<AIAssistantPage />} />
+            <Route path="/challenges" element={<ChallengesPage />} />
+            <Route path="/assess" element={<AssessmentPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/instructor" element={<InstructorPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </main>
 
-      <Footer />
-    </div>
-  </QLoopCircuitProvider>
+        {pathname === '/' && <Footer />}
+      </div>
+    </QLoopCircuitProvider>
   )
 }
 
