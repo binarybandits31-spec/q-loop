@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Supabase JWT verification (optional)
     SUPABASE_JWT_SECRET: str = ""
     SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
 
     # OpenAI (optional)
     OPENAI_API_KEY: str = ""

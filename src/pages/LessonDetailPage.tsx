@@ -1,4 +1,9 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Clock, BookOpen, CheckCircle2, XCircle, ChevronRight, PlayCircle, CircuitBoard, Lightbulb, Target } from 'lucide-react'
 import { getLessonById, getAllLessons, MODULES } from '@/lib/quantum/lessons'
@@ -82,7 +87,67 @@ export default function LessonDetailPage() {
           <div className="space-y-6 animate-fade-in-up">
             <Card className="p-8 glass">
               <div className="flex items-center gap-2 mb-4"><BookOpen className="w-5 h-5 text-primary" /><h2 className="text-xl font-semibold">{lesson.content[activeSection].heading}</h2></div>
-              <p className="text-muted-foreground leading-relaxed text-base mb-6">{lesson.content[activeSection].body}</p>
+              <div className="text-muted-foreground leading-relaxed text-base mb-6">
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm, remarkMath]}
+    rehypePlugins={[rehypeKatex]}
+    components={{
+      h1: ({ children }) => (
+        <h1 className="text-2xl font-bold text-foreground mt-8 mb-4">{children}</h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="text-xl font-semibold text-foreground mt-7 mb-3">{children}</h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="text-lg font-semibold text-foreground mt-5 mb-2">{children}</h3>
+      ),
+      p: ({ children }) => <p className="mb-4 leading-7">{children}</p>,
+      ul: ({ children }) => (
+        <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>
+      ),
+      ol: ({ children }) => (
+        <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>
+      ),
+      li: ({ children }) => <li className="pl-1">{children}</li>,
+      blockquote: ({ children }) => (
+        <blockquote className="border-l-4 border-primary/50 pl-4 my-4 italic">
+          {children}
+        </blockquote>
+      ),
+      table: ({ children }) => (
+        <div className="overflow-x-auto my-5">
+          <table className="w-full border-collapse text-sm">{children}</table>
+        </div>
+      ),
+      th: ({ children }) => (
+        <th className="border border-border bg-muted p-2 text-left font-semibold">
+          {children}
+        </th>
+      ),
+      td: ({ children }) => (
+        <td className="border border-border p-2 align-top">{children}</td>
+      ),
+      pre: ({ children }) => (
+        <pre className="overflow-x-auto rounded-lg bg-muted p-4 my-4 text-sm">
+          {children}
+        </pre>
+      ),
+      code: ({ children, className }) =>
+        className ? (
+          <code className={className}>{children}</code>
+        ) : (
+          <code className="rounded bg-muted px-1 py-0.5">{children}</code>
+        ),
+      a: ({ children, href }) => (
+        <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">
+          {children}
+        </a>
+      ),
+    }}
+  >
+    {lesson.content[activeSection].body}
+  </ReactMarkdown>
+</div>
               {lesson.content[activeSection].formula && (
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <div className="flex items-center gap-2 mb-2"><Lightbulb className="w-4 h-4 text-primary" /><span className="text-xs font-medium text-primary">Key Formula</span></div>
@@ -101,58 +166,187 @@ export default function LessonDetailPage() {
           <div className="space-y-6 animate-fade-in-up">
             <Card className="p-8 glass">
               <div className="flex items-center gap-2 mb-6"><PlayCircle className="w-5 h-5 text-primary" /><h2 className="text-xl font-semibold">Knowledge Check</h2></div>
-              <div className="space-y-6">
-                {lesson.quiz.map((q, qIdx) => (
-                  <div key={q.id}>
-                    <p className="font-medium mb-3"><span className="text-primary mr-2">{qIdx + 1}.</span>{q.question}</p>
-                    <div className="space-y-2">
-                      {q.options.map((option, optIdx) => {
-                        const isSelected = quizAnswers[q.id] === optIdx
-                        const isCorrect = optIdx === q.correctIndex
-                        const showResult = quizSubmitted && isSelected
-                        const showCorrect = quizSubmitted && isCorrect
-                        return (
-                          <button key={optIdx} onClick={() => !quizSubmitted && setQuizAnswers((p) => ({ ...p, [q.id]: optIdx }))} disabled={quizSubmitted}
-                            className={cn('w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center justify-between',
-                              !quizSubmitted && isSelected && 'border-primary bg-primary/10',
-                              !quizSubmitted && !isSelected && 'border-border hover:border-primary/40 hover:bg-muted/30',
-                              showResult && isCorrect && 'border-success bg-success/10',
-                              showResult && !isCorrect && 'border-error bg-error/10',
-                              showCorrect && !isSelected && 'border-success/40 bg-success/5',
-                              quizSubmitted && !isCorrect && !isSelected && 'border-border opacity-50')}>
-                            <span className="text-sm">{option}</span>
-                            {showResult && isCorrect && <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />}
-                            {showResult && !isCorrect && <XCircle className="w-5 h-5 text-error flex-shrink-0" />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {quizSubmitted && <p className="text-sm text-muted-foreground mt-2 pl-1">{q.explanation}</p>}
-                  </div>
-                ))}
-              </div>
-              {quizSubmitted && (
-                <div className="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex items-center gap-3">
-                    <div className={cn('w-10 h-10 rounded-full flex items-center justify-center', quizScore === lesson.quiz.length ? 'bg-success/20' : 'bg-warning/20')}>
-                      <span className={cn('font-bold', quizScore === lesson.quiz.length ? 'text-success' : 'text-warning')}>{quizScore}/{lesson.quiz.length}</span>
-                    </div>
-                    <p className="font-medium">{quizScore === lesson.quiz.length ? 'Perfect! You\'ve mastered this lesson.' : quizScore >= lesson.quiz.length / 2 ? 'Good progress! Review and try again.' : 'Keep learning! Review the lesson content.'}</p>
-                  </div>
-                </div>
+              {lesson.quiz.length > 0 ? (
+  <>
+    <div className="space-y-6">
+      {lesson.quiz.map((q, qIdx) => (
+        <div key={q.id}>
+          <p className="font-medium mb-3">
+            <span className="text-primary mr-2">{qIdx + 1}.</span>
+            {q.question}
+          </p>
+
+          <div className="space-y-2">
+            {q.options.map((option, optIdx) => {
+              const isSelected = quizAnswers[q.id] === optIdx
+              const isCorrect = optIdx === q.correctIndex
+              const showResult = quizSubmitted && isSelected
+              const showCorrect = quizSubmitted && isCorrect
+
+              return (
+                <button
+                  key={optIdx}
+                  onClick={() =>
+                    !quizSubmitted &&
+                    setQuizAnswers((p) => ({ ...p, [q.id]: optIdx }))
+                  }
+                  disabled={quizSubmitted}
+                  className={cn(
+                    'w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center justify-between',
+                    !quizSubmitted && isSelected && 'border-primary bg-primary/10',
+                    !quizSubmitted && !isSelected && 'border-border hover:border-primary/40 hover:bg-muted/30',
+                    showResult && isCorrect && 'border-success bg-success/10',
+                    showResult && !isCorrect && 'border-error bg-error/10',
+                    showCorrect && !isSelected && 'border-success/40 bg-success/5',
+                    quizSubmitted && !isCorrect && !isSelected && 'border-border opacity-50'
+                  )}
+                >
+                  <span className="text-sm">{option}</span>
+                  {showResult && isCorrect && (
+                    <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
+                  )}
+                  {showResult && !isCorrect && (
+                    <XCircle className="w-5 h-5 text-error flex-shrink-0" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {quizSubmitted && (
+            <p className="text-sm text-muted-foreground mt-2 pl-1">
+              {q.explanation}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+
+    {quizSubmitted && (
+      <div className="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center',
+              quizScore === lesson.quiz.length ? 'bg-success/20' : 'bg-warning/20'
+            )}
+          >
+            <span
+              className={cn(
+                'font-bold',
+                quizScore === lesson.quiz.length ? 'text-success' : 'text-warning'
               )}
-              <div className="flex items-center justify-between mt-6">
-                <Button variant="outline" onClick={() => setActiveSection(activeSection - 1)} className="gap-2"><ArrowLeft className="w-4 h-4" /> Back to Lesson</Button>
-                {!quizSubmitted ? (
-                  <Button onClick={() => setQuizSubmitted(true)} disabled={!allAnswered} className="bg-primary text-primary-foreground hover:bg-primary/90">{allAnswered ? 'Submit Answers' : `Answer all (${Object.keys(quizAnswers).length}/${lesson.quiz.length})`}</Button>
-                ) : (
-                  <div className="flex gap-2">
-                    {lesson.circuitExample && <Button asChild variant="outline" className="gap-2"><Link to="/circuit"><CircuitBoard className="w-4 h-4" /> Try Circuit</Link></Button>}
-                    {nextLesson && <Button onClick={() => { setQuizSubmitted(false); setQuizAnswers({}); setActiveSection(0); navigate(`/learn/${nextLesson.id}`); }} className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">Next Lesson <ArrowRight className="w-4 h-4" /></Button>}
-                  </div>
-                )}
-              </div>
-            </Card>
+            >
+              {quizScore}/{lesson.quiz.length}
+            </span>
+          </div>
+
+          <p className="font-medium">
+            {quizScore === lesson.quiz.length
+              ? "Perfect! You've mastered this lesson."
+              : quizScore >= lesson.quiz.length / 2
+                ? 'Good progress! Review and try again.'
+                : 'Keep learning! Review the lesson content.'}
+          </p>
+        </div>
+      </div>
+    )}
+
+    <div className="flex items-center justify-between mt-6">
+      <Button
+        variant="outline"
+        onClick={() => setActiveSection(activeSection - 1)}
+        className="gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Lesson
+      </Button>
+
+      {!quizSubmitted ? (
+        <Button
+          onClick={() => setQuizSubmitted(true)}
+          disabled={!allAnswered}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {allAnswered
+            ? 'Submit Answers'
+            : `Answer all (${Object.keys(quizAnswers).length}/${lesson.quiz.length})`}
+        </Button>
+      ) : (
+        <div className="flex gap-2">
+          {lesson.circuitExample && (
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/circuit">
+                <CircuitBoard className="w-4 h-4" />
+                Try Circuit
+              </Link>
+            </Button>
+          )}
+
+          {nextLesson && (
+            <Button
+              onClick={() => {
+                setQuizSubmitted(false)
+                setQuizAnswers({})
+                setActiveSection(0)
+                navigate(`/learn/${nextLesson.id}`)
+              }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+            >
+              Next Lesson
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  </>
+) : (
+  <div className="space-y-5">
+    <div className="rounded-lg border border-border bg-muted/30 p-5">
+      <h3 className="font-semibold text-foreground mb-2">
+        Chapter Assessment
+      </h3>
+
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        This chapter's review questions, exercises, and assessment material
+        are included in the textbook content. A separate interactive quiz
+        has not been configured for this chapter yet.
+      </p>
+    </div>
+
+    <div className="flex items-center justify-between">
+      <Button
+        variant="outline"
+        onClick={() => setActiveSection(activeSection - 1)}
+        className="gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Lesson
+      </Button>
+
+      {nextLesson ? (
+        <Button
+          onClick={() => {
+            setQuizSubmitted(false)
+            setQuizAnswers({})
+            setActiveSection(0)
+            navigate(`/learn/${nextLesson.id}`)
+          }}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+        >
+          Next Lesson
+          <ArrowRight className="w-4 h-4" />
+        </Button>
+      ) : (
+        <span className="text-sm font-medium text-success">
+          Module completed
+        </span>
+      )}
+    </div>
+  </div>
+)}
+                </Card>
           </div>
         )}
 
@@ -174,3 +368,4 @@ export default function LessonDetailPage() {
     </div>
   )
 }
+

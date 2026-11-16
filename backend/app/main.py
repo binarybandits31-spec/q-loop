@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from .core.config import settings
-from .api import auth, modules, lessons, circuits, simulator, code, ai, challenges, progress, instructor
+from .api import auth, modules, lessons, circuits, simulator, code, ai, challenges, progress, instructor, chat
 from .schemas.circuit import CircuitExecuteRequest
 
 
@@ -62,6 +62,7 @@ def create_app() -> FastAPI:
         challenges.router,
         progress.router,
         instructor.router,
+        chat.router,
     ]:
         app.include_router(router)
 

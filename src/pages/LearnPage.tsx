@@ -21,8 +21,24 @@ const DIFFICULTY_STYLES: Record<string, string> = {
 }
 
 export default function LearnPage() {
-  return (
-    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
+  const allLessons = MODULES.flatMap((module) =>
+  module.lessons.map((lesson) => ({
+    module: module.id,
+    lesson: lesson.id,
+    title: lesson.title,
+    quiz: lesson.quiz,
+  }))
+);
+
+console.log(
+  'LESSONS WITH MISSING QUIZ:',
+  JSON.stringify(
+    allLessons.filter((lesson) => !Array.isArray(lesson.quiz)),
+    null,
+    2
+  )
+);
+  return (    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass border border-primary/20 mb-4">

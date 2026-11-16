@@ -1,4 +1,5 @@
 import { useQLoopCircuit } from '@/context/QLoopCircuitContext'
+import { useAuth } from '@/hooks/use-auth'
 import { useState, useRef, useEffect } from 'react'
 import {
   Brain,
@@ -13,6 +14,7 @@ import {
   Zap,
   Atom,
   Info,
+  Plus,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +28,22 @@ interface Message {
   content: string
   timestamp: number
   code?: string
+}
+
+interface Conversation {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+interface StoredMessage {
+  id: string
+  conversation_id: string
+  role: 'user' | 'assistant'
+  content: string
+  code?: string | null
+  created_at: string
 }
 
 interface KnowledgeEntry {
@@ -201,7 +219,15 @@ const MOCK_CONTEXT: ContextInfo = {
 // ─── Component ────────────────────────────────────────────────────────
 
 export default function AIAssistantPage() {
-    const {
+  const { session, loading: authLoading } = useAuth()
+  const API_BASE_URL =
+    import.meta.env.VITE_API_URL?.trim() || 'https://q-loop.onrender.com'
+
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [historyNotice, setHistoryNotice] = useState('')
+
+  const {
     numQubits,
     operations,
     simulationResult,
@@ -219,8 +245,85 @@ export default function AIAssistantPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [showContext, setShowContext] = useState(false)
 
+  const accessToken = session?.access_token
+
+  const historyRequest = async (path: string, init: RequestInit = {}) => {
+    if (!accessToken) throw new Error('Please sign in to use saved chat history.')
+    const response = await fetch(`${API_BASE_URL}/api/chat${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        ...init.headers,
+      },
+    })
+    if (!response.ok) {
+      throw new Error(`Chat history request failed: ${response.status}`)
+    }
+    if (response.status === 204) return null
+    return response.json()
+  }
+
+  const handleNewChat = () => {
+    setActiveConversationId(null)
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: GREETING_RESPONSE,
+      timestamp: Date.now(),
+    }])
+    setHistoryNotice('')
+    setInput('')
+  }
+
+  const handleOpenConversation = async (conversation: Conversation) => {
+    try {
+      const stored = await historyRequest(
+        `/conversations/${encodeURIComponent(conversation.id)}/messages`,
+      ) as StoredMessage[]
+      setMessages(stored.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        code: message.code || undefined,
+        timestamp: new Date(message.created_at).getTime(),
+      })))
+      setActiveConversationId(conversation.id)
+      setHistoryNotice('')
+    } catch (error) {
+      console.error('Could not load saved conversation:', error)
+      setHistoryNotice('Could not load chat history. Check your sign-in and backend configuration.')
+    }
+  }
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+useEffect(() => {
+  if (authLoading) return
+  if (!accessToken) {
+    setConversations([])
+    setHistoryNotice('Sign in to save and reopen your AI Tutor conversations.')
+    return
+  }
+
+  let cancelled = false
+  historyRequest('/conversations')
+    .then((items: Conversation[]) => {
+      if (!cancelled) {
+        setConversations(items)
+        setHistoryNotice('')
+      }
+    })
+    .catch((error) => {
+      console.error('Could not load chat history:', error)
+      if (!cancelled) {
+        setHistoryNotice('Saved history is unavailable until the chat API and database are configured.')
+      }
+    })
+
+  return () => { cancelled = true }
+}, [accessToken, authLoading])
+
 useEffect(() => {
   const chatContainer = messagesEndRef.current?.parentElement
 
@@ -248,6 +351,28 @@ useEffect(() => {
     setInput('')
     setIsTyping(true)
 
+    let conversationId = activeConversationId
+    if (accessToken) {
+      try {
+        if (!conversationId) {
+          const created = await historyRequest('/conversations', {
+            method: 'POST',
+            body: JSON.stringify({ title: content.slice(0, 80) || 'New conversation' }),
+          }) as Conversation
+          conversationId = created.id
+          setActiveConversationId(created.id)
+          setConversations((prev) => [created, ...prev.filter((item) => item.id !== created.id)])
+        }
+        await historyRequest(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ role: 'user', content }),
+        })
+      } catch (error) {
+        console.error('Could not save user message:', error)
+        setHistoryNotice('This reply may not be saved. Check the chat API, database migration, and sign-in configuration.')
+      }
+    }
+
     try {
       // Detect whether the user wants code.
       const wantsCode =
@@ -257,9 +382,6 @@ useEffect(() => {
 
       // Select the correct backend endpoint.
       // Local development uses the FastAPI server running on port 8000.
-      const API_BASE_URL =
-        import.meta.env.VITE_API_URL?.trim() || 'https://q-loop.onrender.com'
-
       const endpoint = wantsCode
         ? `${API_BASE_URL}/api/ai/generate-code`
         : `${API_BASE_URL}/api/ai/explain`
@@ -306,6 +428,25 @@ if (!response.ok) {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+
+      if (accessToken && conversationId) {
+        try {
+          await historyRequest(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+              role: 'assistant',
+              content: assistantMessage.content,
+              code: assistantMessage.code ?? null,
+            }),
+          })
+          const refreshed = await historyRequest('/conversations') as Conversation[]
+          setConversations(refreshed)
+          setHistoryNotice('')
+        } catch (saveError) {
+          console.error('Could not save assistant reply:', saveError)
+          setHistoryNotice('The AI reply appeared, but saving it failed. Check the backend and database configuration.')
+        }
+      }
     } catch (error) {
       console.error('AI Tutor request failed:', error)
 
@@ -397,6 +538,43 @@ if (!response.ok) {
             <Info className="mr-1.5 h-4 w-4" />
             {showContext ? 'Hide Context' : 'Show Context'}
           </Button>
+        </div>
+
+        <div className="mb-5 rounded-xl border border-cyan-500/20 bg-slate-900/50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm font-medium text-slate-200">Saved conversations</div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNewChat}
+              className="border-cyan-500/30 text-cyan-200 hover:bg-cyan-500/10"
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              New Chat
+            </Button>
+          </div>
+          {historyNotice && (
+            <p className="mt-2 text-xs text-amber-300">{historyNotice}</p>
+          )}
+          {accessToken && conversations.length > 0 && (
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {conversations.map((conversation) => (
+                <Button
+                  key={conversation.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleOpenConversation(conversation)}
+                  className={cn(
+                    'max-w-56 shrink-0 truncate border-slate-700 text-slate-300 hover:bg-slate-800',
+                    activeConversationId === conversation.id && 'border-cyan-500/50 bg-cyan-500/10 text-cyan-200',
+                  )}
+                  title={conversation.title}
+                >
+                  <span className="truncate">{conversation.title}</span>
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

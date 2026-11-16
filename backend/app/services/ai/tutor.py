@@ -1,12 +1,19 @@
 """
 Q-Loop AI Tutor
 
-Provides explanations for quantum-algorithm learning questions,
-using Q-Loop circuit context and the QLoopAgent when simulation
-is required.
+Provides explanations for quantum-algorithm learning questions.
+
+AI responses are handled by the local Jarvis bridge through WebSocket.
+Q-Loop's own QLoopAgent remains responsible for circuit simulation.
 """
 
 from typing import Any, Dict, Optional
+import asyncio
+import json
+import os
+import uuid
+
+import websocket
 
 from app.services.ai.agent import agent
 
@@ -71,21 +78,37 @@ class AITutor:
     Main Q-Loop AI Tutor.
 
     The tutor can:
-    - answer basic quantum-algorithm questions
+    - answer quantum-algorithm questions through Jarvis
     - inspect the learner's circuit context
     - request simulation through QLoopAgent
     - explain actual simulation results
-    - optionally use OpenAI when configured
+    - fall back to the local Q-Loop knowledge base if Jarvis
+      is temporarily unavailable
     """
 
     def __init__(self) -> None:
         self.knowledge_base = KNOWLEDGE_BASE
 
+        self.jarvis_bridge_url = os.getenv(
+            "JARVIS_BRIDGE_URL",
+            "ws://localhost:8787",
+        )
+
+        self.jarvis_timeout = float(
+            os.getenv(
+                "JARVIS_BRIDGE_TIMEOUT",
+                "60",
+            )
+        )
+
     # -----------------------------------------------------------------------
     # Context formatting
     # -----------------------------------------------------------------------
 
-    def _context_text(self, context: Optional[Dict[str, Any]]) -> str:
+    def _context_text(
+        self,
+        context: Optional[Dict[str, Any]],
+    ) -> str:
         """
         Convert Q-Loop learner/circuit context into readable text.
         """
@@ -97,23 +120,33 @@ class AITutor:
 
         learner_level = context.get("learner_level")
         if learner_level:
-            lines.append(f"Learner level: {learner_level}")
+            lines.append(
+                f"Learner level: {learner_level}"
+            )
 
         lesson_id = context.get("lesson_id")
         if lesson_id:
-            lines.append(f"Lesson: {lesson_id}")
+            lines.append(
+                f"Lesson: {lesson_id}"
+            )
 
         module_id = context.get("module_id")
         if module_id:
-            lines.append(f"Module: {module_id}")
+            lines.append(
+                f"Module: {module_id}"
+            )
 
         detected_mistake = context.get("detected_mistake")
         if detected_mistake:
-            lines.append(f"Detected mistake: {detected_mistake}")
+            lines.append(
+                f"Detected mistake: {detected_mistake}"
+            )
 
         challenge_id = context.get("challenge_id")
         if challenge_id:
-            lines.append(f"Challenge: {challenge_id}")
+            lines.append(
+                f"Challenge: {challenge_id}"
+            )
 
         # ---------------------------------------------------------------
         # Circuit context
@@ -127,36 +160,72 @@ class AITutor:
 
             if isinstance(circuit, dict):
                 qubits = circuit.get("qubits")
-                if qubits is not None:
-                    lines.append(f"- Qubits: {qubits}")
 
-                operations = circuit.get("operations", [])
+                if qubits is not None:
+                    lines.append(
+                        f"- Qubits: {qubits}"
+                    )
+
+                operations = circuit.get(
+                    "operations",
+                    [],
+                )
 
                 if operations:
-                    for index, operation in enumerate(operations, start=1):
+                    for index, operation in enumerate(
+                        operations,
+                        start=1,
+                    ):
                         if not isinstance(operation, dict):
-                            lines.append(f"- Operation {index}: {operation}")
+                            lines.append(
+                                f"- Operation {index}: {operation}"
+                            )
                             continue
 
-                        gate = operation.get("gate", "?")
-                        target = operation.get("target")
+                        gate = operation.get(
+                            "gate",
+                            "?",
+                        )
 
-                        description = f"- {index}. {gate}"
+                        target = operation.get(
+                            "target"
+                        )
+
+                        description = (
+                            f"- {index}. {gate}"
+                        )
 
                         if target is not None:
-                            description += f" on q{target}"
+                            description += (
+                                f" on q{target}"
+                            )
 
-                        control = operation.get("control")
+                        control = operation.get(
+                            "control"
+                        )
+
                         if control is not None:
-                            description += f", control q{control}"
+                            description += (
+                                f", control q{control}"
+                            )
 
-                        control2 = operation.get("control2")
+                        control2 = operation.get(
+                            "control2"
+                        )
+
                         if control2 is not None:
-                            description += f", control2 q{control2}"
+                            description += (
+                                f", control2 q{control2}"
+                            )
 
-                        parameter = operation.get("parameter")
+                        parameter = operation.get(
+                            "parameter"
+                        )
+
                         if parameter is not None:
-                            description += f", parameter={parameter}"
+                            description += (
+                                f", parameter={parameter}"
+                            )
 
                         lines.append(description)
 
@@ -164,116 +233,245 @@ class AITutor:
         # Simulation result context
         # ---------------------------------------------------------------
 
-        simulation_result = context.get("simulation_result")
+        simulation_result = context.get(
+            "simulation_result"
+        )
 
         if simulation_result:
             lines.append("")
-            lines.append("Latest simulation result:")
+            lines.append(
+                "Latest simulation result:"
+            )
 
-            if isinstance(simulation_result, dict):
-                framework = simulation_result.get("framework")
+            if isinstance(
+                simulation_result,
+                dict,
+            ):
+                framework = simulation_result.get(
+                    "framework"
+                )
+
                 if framework:
-                    lines.append(f"- Framework: {framework}")
+                    lines.append(
+                        f"- Framework: {framework}"
+                    )
 
-                shots = simulation_result.get("shots")
+                shots = simulation_result.get(
+                    "shots"
+                )
+
                 if shots is not None:
-                    lines.append(f"- Shots: {shots}")
+                    lines.append(
+                        f"- Shots: {shots}"
+                    )
 
-                depth = simulation_result.get("circuit_depth")
+                depth = simulation_result.get(
+                    "circuit_depth"
+                )
+
                 if depth is not None:
-                    lines.append(f"- Circuit depth: {depth}")
+                    lines.append(
+                        f"- Circuit depth: {depth}"
+                    )
 
-                gate_count = simulation_result.get("gate_count")
+                gate_count = simulation_result.get(
+                    "gate_count"
+                )
+
                 if gate_count is not None:
-                    lines.append(f"- Gate count: {gate_count}")
+                    lines.append(
+                        f"- Gate count: {gate_count}"
+                    )
 
-                counts = simulation_result.get("counts")
+                counts = simulation_result.get(
+                    "counts"
+                )
 
                 if counts:
-                    lines.append("- Measurement counts:")
+                    lines.append(
+                        "- Measurement counts:"
+                    )
 
                     for state, count in counts.items():
-                        lines.append(f"  - |{state}>: {count}")
+                        lines.append(
+                            f"  - |{state}>: {count}"
+                        )
 
-                probabilities = simulation_result.get("probabilities")
+                probabilities = simulation_result.get(
+                    "probabilities"
+                )
 
                 if probabilities:
-                    lines.append("- Probabilities:")
+                    lines.append(
+                        "- Probabilities:"
+                    )
 
-                    for state, probability in probabilities.items():
+                    for state, probability in (
+                        probabilities.items()
+                    ):
                         lines.append(
-                            f"  - |{state}>: {float(probability) * 100:.2f}%"
+                            f"  - |{state}>: "
+                            f"{float(probability) * 100:.2f}%"
                         )
 
         return "\n".join(lines)
 
     # -----------------------------------------------------------------------
-    # Optional OpenAI support
+    # Jarvis AI
     # -----------------------------------------------------------------------
 
-    def _ask_openai(
+    def _ask_jarvis_sync(
         self,
         question: str,
         context: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
-        Optional OpenAI fallback.
+        Send a tutor request to the Jarvis WebSocket bridge.
 
-        If OpenAI is not configured or unavailable, return None so that
-        the local Q-Loop tutor can continue working.
+        Expected request:
+
+            {
+                "type": "ask",
+                "id": "...",
+                "text": "..."
+            }
+
+        Expected completion message:
+
+            {
+                "type": "done",
+                "text": "..."
+            }
         """
 
-        try:
-            import os
+        request_id = str(uuid.uuid4())
 
-            api_key = os.getenv("OPENAI_API_KEY")
+        context_text = self._context_text(
+            context
+        )
 
-            if not api_key:
-                return None
-
-            from openai import OpenAI
-
-            client = OpenAI(api_key=api_key)
-
-            system_prompt = """
-You are the Q-Loop AI Tutor.
+        prompt = f"""
+You are the AI Tutor inside Q-Loop.
 
 Q-Loop is an interactive platform for learning quantum algorithms.
 
-Explain concepts clearly for students.
+Your job is to teach quantum algorithms clearly and accurately.
 
-Rules:
+Important rules:
+- Explain quantum algorithms rather than focusing only on quantum hardware.
 - Prefer beginner-friendly explanations.
-- Explain quantum algorithms rather than only quantum computing hardware.
-- Use the learner's circuit and simulation result when supplied.
+- Adapt the explanation to the learner level when supplied.
+- Explain quantum gates step by step when relevant.
+- Use the supplied Q-Loop circuit context when it is relevant.
+- Use actual simulation results when they are supplied.
 - Never invent simulation results.
-- If actual simulator results are supplied, use those values.
-- Explain gates step by step.
-"""
+- If a simulation result is provided, use its actual values.
+- If the learner asks for an explanation, teach rather than merely giving a definition.
+- Use simple examples where useful.
+- Keep mathematical notation readable.
+- Do not claim that you personally executed a simulation.
+- The Q-Loop simulator is responsible for actual circuit execution.
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Question:\n{question}\n\n"
-                            f"Q-Loop context:\n"
-                            f"{self._context_text(context)}"
-                        ),
-                    },
-                ],
-                temperature=0.2,
+Learner question:
+{question}
+
+Q-Loop context:
+{context_text}
+""".strip()
+
+        payload = {
+            "type": "ask",
+            "id": request_id,
+            "text": prompt,
+        }
+
+        ws = None
+
+        try:
+            ws = websocket.create_connection(
+    self.jarvis_bridge_url,
+    timeout=self.jarvis_timeout,
+    origin="http://localhost:5173",
+)
+
+            ws.send(
+                json.dumps(payload)
             )
 
-            return response.choices[0].message.content
+            while True:
+                raw_message = ws.recv()
 
-        except Exception:
+                if not raw_message:
+                    continue
+
+                try:
+                    message = json.loads(
+                        raw_message
+                    )
+                except json.JSONDecodeError:
+                    continue
+
+                message_type = message.get(
+                    "type"
+                )
+
+                # -------------------------------------------------------
+                # Final Jarvis answer
+                # -------------------------------------------------------
+
+                if message_type == "done":
+                    response_text = message.get(
+                        "text"
+                    )
+
+                    if response_text:
+                        return str(
+                            response_text
+                        )
+
+                    return None
+
+                # -------------------------------------------------------
+                # Jarvis-side error
+                # -------------------------------------------------------
+
+                if message_type == "error":
+                    return None
+
+                # -------------------------------------------------------
+                # Ignore progress/intermediate messages.
+                # Continue waiting for "done".
+                # -------------------------------------------------------
+
+        except Exception as exc:
+            print(
+                "Jarvis bridge request failed: "
+                f"{exc}"
+            )
             return None
+
+        finally:
+            if ws is not None:
+                try:
+                    ws.close()
+                except Exception:
+                    pass
+
+    async def _ask_jarvis(
+        self,
+        question: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """
+        Run the blocking WebSocket client without blocking
+        the FastAPI event loop.
+        """
+
+        return await asyncio.to_thread(
+            self._ask_jarvis_sync,
+            question,
+            context,
+        )
 
     # -----------------------------------------------------------------------
     # Decide whether the agent should use a tool
@@ -299,10 +497,14 @@ Rules:
             if not analysis:
                 return None
 
-            if analysis.get("action") != "tool_required":
+            if analysis.get(
+                "action"
+            ) != "tool_required":
                 return None
 
-            tool_name = analysis.get("tool")
+            tool_name = analysis.get(
+                "tool"
+            )
 
             if tool_name != "simulate_circuit":
                 return None
@@ -310,7 +512,9 @@ Rules:
             circuit = None
 
             if context:
-                circuit = context.get("circuit")
+                circuit = context.get(
+                    "circuit"
+                )
 
             if not circuit:
                 return None
@@ -336,15 +540,6 @@ Rules:
     ) -> str:
         """
         Build an explanation from the ACTUAL Q-Loop simulation result.
-
-        This function explains:
-        1. Which backend was used.
-        2. How many shots were executed.
-        3. Circuit depth and gate count.
-        4. The actual gates in the circuit.
-        5. The actual measurement counts.
-        6. The actual probabilities.
-        7. Bell-state behavior when the circuit matches H + CNOT.
         """
 
         if not simulation_result:
@@ -353,46 +548,59 @@ Rules:
                 "Q-Loop simulator."
             )
 
-        status = simulation_result.get("status", "unknown")
+        status = simulation_result.get(
+            "status",
+            "unknown",
+        )
 
         if status != "success":
-            error = simulation_result.get("error")
+            error = simulation_result.get(
+                "error"
+            )
 
             if error:
                 return (
-                    "The Q-Loop simulator could not complete the simulation.\n\n"
+                    "The Q-Loop simulator could not complete "
+                    "the simulation.\n\n"
                     f"Error: {error}"
                 )
 
             return (
-                "The Q-Loop simulator could not complete the simulation."
+                "The Q-Loop simulator could not complete "
+                "the simulation."
             )
 
         lines = []
-
-        # -------------------------------------------------------------------
-        # Basic simulation information
-        # -------------------------------------------------------------------
 
         framework = simulation_result.get(
             "framework",
             "Q-Loop simulator",
         )
 
-        shots = simulation_result.get("shots")
+        shots = simulation_result.get(
+            "shots"
+        )
 
-        circuit_depth = simulation_result.get("circuit_depth")
+        circuit_depth = simulation_result.get(
+            "circuit_depth"
+        )
 
-        gate_count = simulation_result.get("gate_count")
+        gate_count = simulation_result.get(
+            "gate_count"
+        )
 
         lines.append(
             "I ran the circuit using the Q-Loop simulator."
         )
 
-        lines.append(f"Backend: {framework}")
+        lines.append(
+            f"Backend: {framework}"
+        )
 
         if shots is not None:
-            lines.append(f"Shots: {shots}")
+            lines.append(
+                f"Shots: {shots}"
+            )
 
         if circuit_depth is not None:
             lines.append(
@@ -408,15 +616,25 @@ Rules:
         # Get the circuit that was actually simulated
         # -------------------------------------------------------------------
 
-        circuit = simulation_result.get("circuit")
+        circuit = simulation_result.get(
+            "circuit"
+        )
 
         if not circuit and context:
-            circuit = context.get("circuit")
+            circuit = context.get(
+                "circuit"
+            )
 
         operations = []
 
-        if isinstance(circuit, dict):
-            operations = circuit.get("operations", []) or []
+        if isinstance(
+            circuit,
+            dict,
+        ):
+            operations = circuit.get(
+                "operations",
+                [],
+            ) or []
 
         if not operations:
             operations = simulation_result.get(
@@ -430,7 +648,9 @@ Rules:
 
         if operations:
             lines.append("")
-            lines.append("Circuit explanation:")
+            lines.append(
+                "Circuit explanation:"
+            )
 
             gate_names = []
 
@@ -438,20 +658,30 @@ Rules:
                 operations,
                 start=1,
             ):
-                if not isinstance(operation, dict):
+                if not isinstance(
+                    operation,
+                    dict,
+                ):
                     continue
 
                 gate = str(
-                    operation.get("gate", "")
+                    operation.get(
+                        "gate",
+                        "",
+                    )
                 ).upper()
 
-                target = operation.get("target")
+                target = operation.get(
+                    "target"
+                )
 
-                control = operation.get("control")
+                control = operation.get(
+                    "control"
+                )
 
-                control2 = operation.get("control2")
-
-                parameter = operation.get("parameter")
+                parameter = operation.get(
+                    "parameter"
+                )
 
                 gate_names.append(gate)
 
@@ -560,7 +790,10 @@ Rules:
                             f"{index}. {gate} gate on q{target}."
                         )
 
-                elif gate in ("TOFFOLI", "CCX"):
+                elif gate in (
+                    "TOFFOLI",
+                    "CCX",
+                ):
                     lines.append(
                         f"{index}. {gate} gate: "
                         "uses two control qubits and "
@@ -578,14 +811,16 @@ Rules:
             # ---------------------------------------------------------------
 
             normalized_gates = [
-                gate for gate in gate_names
+                gate
+                for gate in gate_names
                 if gate
             ]
 
             if (
                 len(normalized_gates) >= 2
                 and normalized_gates[0] == "H"
-                and normalized_gates[1] in ("CX", "CNOT")
+                and normalized_gates[1]
+                in ("CX", "CNOT")
             ):
                 lines.append("")
                 lines.append(
@@ -612,11 +847,15 @@ Rules:
         # Actual measurement results
         # -------------------------------------------------------------------
 
-        counts = simulation_result.get("counts")
+        counts = simulation_result.get(
+            "counts"
+        )
 
         if counts:
             lines.append("")
-            lines.append("Actual measurement results:")
+            lines.append(
+                "Actual measurement results:"
+            )
 
             total_counts = sum(
                 int(value)
@@ -624,7 +863,6 @@ Rules:
             )
 
             for state, count in counts.items():
-
                 count_value = int(count)
 
                 if total_counts > 0:
@@ -658,13 +896,17 @@ Rules:
 
         if probabilities:
             lines.append("")
-            lines.append("Calculated probabilities:")
+            lines.append(
+                "Calculated probabilities:"
+            )
 
-            for state, probability in probabilities.items():
-
+            for state, probability in (
+                probabilities.items()
+            ):
                 try:
                     percentage = (
-                        float(probability) * 100
+                        float(probability)
+                        * 100
                     )
                 except (
                     TypeError,
@@ -690,6 +932,9 @@ Rules:
     ) -> str:
         """
         Answer common quantum-algorithm questions locally.
+
+        This is NOT an external AI model. It is only a safety fallback
+        when the Jarvis bridge is unavailable.
         """
 
         question_lower = question.lower()
@@ -698,8 +943,9 @@ Rules:
         # Direct knowledge-base matching
         # ---------------------------------------------------------------
 
-        for topic, explanation in self.knowledge_base.items():
-
+        for topic, explanation in (
+            self.knowledge_base.items()
+        ):
             if topic in question_lower:
                 return explanation
 
@@ -724,34 +970,55 @@ Rules:
             )
 
         if "hadamard" in question_lower:
-            return self.knowledge_base["hadamard"]
+            return self.knowledge_base[
+                "hadamard"
+            ]
 
         if "cnot" in question_lower:
-            return self.knowledge_base["cnot"]
+            return self.knowledge_base[
+                "cnot"
+            ]
 
         if "bell state" in question_lower:
-            return self.knowledge_base["bell"]
+            return self.knowledge_base[
+                "bell"
+            ]
 
         if "entangle" in question_lower:
-            return self.knowledge_base["entanglement"]
+            return self.knowledge_base[
+                "entanglement"
+            ]
 
         if "measure" in question_lower:
-            return self.knowledge_base["measurement"]
+            return self.knowledge_base[
+                "measurement"
+            ]
 
         if "superposition" in question_lower:
-            return self.knowledge_base["superposition"]
+            return self.knowledge_base[
+                "superposition"
+            ]
 
         if "qubit" in question_lower:
-            return self.knowledge_base["qubit"]
+            return self.knowledge_base[
+                "qubit"
+            ]
 
         # ---------------------------------------------------------------
         # Circuit-aware generic response
         # ---------------------------------------------------------------
 
-        if context and context.get("circuit"):
-            circuit = context.get("circuit")
+        if context and context.get(
+            "circuit"
+        ):
+            circuit = context.get(
+                "circuit"
+            )
 
-            if isinstance(circuit, dict):
+            if isinstance(
+                circuit,
+                dict,
+            ):
                 operations = circuit.get(
                     "operations",
                     [],
@@ -792,7 +1059,9 @@ Rules:
             sources
         """
 
-        question = (question or "").strip()
+        question = (
+            question or ""
+        ).strip()
 
         if not question:
             return {
@@ -807,22 +1076,28 @@ Rules:
                 ],
                 "code_example": None,
                 "confidence": "high",
-                "sources": ["Q-Loop AI Tutor"],
+                "sources": [
+                    "Q-Loop AI Tutor"
+                ],
             }
 
         # -------------------------------------------------------------------
         # 1. Ask QLoopAgent whether simulation is required
         # -------------------------------------------------------------------
 
-        simulation_result = self._run_agent_if_needed(
-            question,
-            context,
+        simulation_result = (
+            self._run_agent_if_needed(
+                question,
+                context,
+            )
         )
 
         if simulation_result:
-            response = self._build_simulation_explanation(
-                simulation_result,
-                context,
+            response = (
+                self._build_simulation_explanation(
+                    simulation_result,
+                    context,
+                )
             )
 
             return {
@@ -841,26 +1116,35 @@ Rules:
             }
 
         # -------------------------------------------------------------------
-        # 2. Optional OpenAI answer
+        # 2. Ask Jarvis
         # -------------------------------------------------------------------
 
-        openai_response = self._ask_openai(
-            question,
-            context,
-        )
+        try:
+            jarvis_response = asyncio.run(
+                self._ask_jarvis(
+                    question,
+                    context,
+                )
+            )
+        except Exception as exc:
+            print(
+                "Jarvis tutor error: "
+                f"{exc}"
+            )
+            jarvis_response = None
 
-        if openai_response:
+        if jarvis_response:
             return {
-                "response": openai_response,
+                "response": jarvis_response,
                 "suggestions": [
                     "Explain it more simply",
                     "Give me an example",
                     "Show the circuit idea",
                 ],
                 "code_example": None,
-                "confidence": "medium",
+                "confidence": "high",
                 "sources": [
-                    "OpenAI",
+                    "Jarvis",
                     "Q-Loop AI Tutor",
                 ],
             }
@@ -885,6 +1169,7 @@ Rules:
             "confidence": "medium",
             "sources": [
                 "Q-Loop AI Tutor",
+                "Local Knowledge Base",
             ],
         }
 
