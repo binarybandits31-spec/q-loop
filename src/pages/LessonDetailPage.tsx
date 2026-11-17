@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -168,11 +168,22 @@ export default function LessonDetailPage() {
   </ReactMarkdown>
 </div>
               {lesson.content[activeSection].formula && (
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-center gap-2 mb-2"><Lightbulb className="w-4 h-4 text-primary" /><span className="text-xs font-medium text-primary">Key Formula</span></div>
-                  <p className="font-mono text-sm text-foreground/90">{lesson.content[activeSection].formula}</p>
-                </div>
-              )}
+  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+    <div className="flex items-center gap-2 mb-2">
+      <Lightbulb className="w-4 h-4 text-primary" />
+      <span className="text-xs font-medium text-primary">Key Formula</span>
+    </div>
+
+    <div className="text-sm text-foreground/90 overflow-x-auto [&_.katex-display]:my-4 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+      >
+        {normalizeMathDelimiters(lesson.content[activeSection].formula)}
+      </ReactMarkdown>
+    </div>
+  </div>
+)}
             </Card>
             <div className="flex items-center justify-between">
               <Button variant="outline" onClick={() => setActiveSection(Math.max(0, activeSection - 1))} disabled={activeSection === 0} className="gap-2"><ArrowLeft className="w-4 h-4" /> Previous</Button>
