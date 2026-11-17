@@ -11,6 +11,25 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+function normalizeMathDelimiters(content: string): string {
+  const lines = content.split('\n')
+  let insideCodeFence = false
+
+  return lines.map((line) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      insideCodeFence = !insideCodeFence
+      return line
+    }
+
+    if (insideCodeFence) return line
+
+    return line
+      .replace(/\\\[/g, () => '$$')
+      .replace(/\\\]/g, () => '$$')
+      .replace(/\\\(/g, () => '$')
+      .replace(/\\\)/g, () => '$')
+  }).join('\n')
+}
 
 export default function LessonDetailPage() {
   const { lessonId } = useParams()
@@ -145,7 +164,7 @@ export default function LessonDetailPage() {
       ),
     }}
   >
-    {lesson.content[activeSection].body}
+    {normalizeMathDelimiters(lesson.content[activeSection].body)}
   </ReactMarkdown>
 </div>
               {lesson.content[activeSection].formula && (

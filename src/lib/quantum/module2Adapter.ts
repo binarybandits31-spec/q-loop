@@ -45,7 +45,6 @@ function getDifficulty(value: unknown): Lesson['difficulty'] {
   return 'Intermediate';
 }
 
-// Preserve chapters that already contain separate content sections.
 function getExistingSections(value: unknown): LessonSection[] {
   if (!Array.isArray(value)) return [];
 
@@ -64,7 +63,6 @@ function getExistingSections(value: unknown): LessonSection[] {
     .filter((section): section is LessonSection => section !== null);
 }
 
-// Split a complete Markdown chapter at its level-two headings.
 function splitTextbookIntoSections(
   body: string,
   chapterTitle: string
@@ -104,6 +102,80 @@ function splitTextbookIntoSections(
   return sections;
 }
 
+// Identify Markdown blocks that should not count as normal paragraphs.
+function isStructuralBlock(block: string): boolean {
+  return /^(#{1,6}\s|>|[-*+]\s|\d+[.)]\s|```|~~~|\$\$|\\\[|\||<)/.test(
+    block.trim()
+  );
+}
+
+// Split sections so each page contains at most two normal paragraphs.
+// Markdown structures such as lists, tables, formulas and code blocks
+// are kept together instead of being deliberately split.
+function splitSectionByParagraphLimit(
+  section: LessonSection
+): LessonSection[] {
+  const blocks = section.body
+    .trim()
+    .split(/\n[ \t]*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (blocks.length === 0) {
+    return [section];
+  }
+
+  const pages: string[][] = [];
+  let currentPage: string[] = [];
+  let paragraphCount = 0;
+
+  function finishPage() {
+    if (currentPage.length > 0) {
+      pages.push(currentPage);
+      currentPage = [];
+      paragraphCount = 0;
+    }
+  }
+
+  for (const block of blocks) {
+    const isHeading = /^#{1,6}\s/.test(block);
+    const isParagraph = !isStructuralBlock(block);
+
+    // Start a new page before a new Markdown heading when
+    // the current page already contains two paragraphs.
+    if (isHeading && paragraphCount >= 2) {
+      finishPage();
+    }
+
+    // Start a new page before the third normal paragraph.
+    if (isParagraph && paragraphCount >= 2) {
+      finishPage();
+    }
+
+    currentPage.push(block);
+
+    if (isParagraph) {
+      paragraphCount++;
+    }
+  }
+
+  finishPage();
+
+  return pages.map((page, index) => ({
+    heading:
+      index === 0
+        ? section.heading
+        : `${section.heading} (continued ${index + 1})`,
+    body: page.join('\n\n'),
+  }));
+}
+
+function applyParagraphPagination(
+  sections: LessonSection[]
+): LessonSection[] {
+  return sections.flatMap(splitSectionByParagraphLimit);
+}
+
 export const MODULE2_LESSONS: Lesson[] = rawChapters.map(
   (chapter, index) => {
     const chapterNumber =
@@ -114,10 +186,8 @@ export const MODULE2_LESSONS: Lesson[] = rawChapters.map(
     const title =
       getText(chapter.title) ?? `Chapter ${chapterNumber}`;
 
-    // Use existing structured sections when available.
     const existingSections = getExistingSections(chapter.content);
 
-    // Otherwise, use the complete textbook text.
     const body =
       getText(chapter.textbookContent) ??
       getText(chapter.sourceText) ??
@@ -129,10 +199,12 @@ export const MODULE2_LESSONS: Lesson[] = rawChapters.map(
       );
     }
 
-    const content =
+    const originalSections =
       existingSections.length > 0
         ? existingSections
         : splitTextbookIntoSections(body!, title);
+
+    const content = applyParagraphPagination(originalSections);
 
     const objectives =
       getStringArray(chapter.objectives).length > 0
