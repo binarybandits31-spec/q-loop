@@ -8,14 +8,12 @@ Q-Loop's own QLoopAgent remains responsible for circuit simulation.
 """
 
 from typing import Any, Dict, Optional
-import asyncio
-import json
-import os
-import uuid
 
-import websocket
+from openai import AsyncOpenAI
 
+from app.core.config import settings
 from app.services.ai.agent import agent
+from app.services.ai.rag import retrieve_relevant_chunks
 
 
 # ---------------------------------------------------------------------------
@@ -88,20 +86,12 @@ class AITutor:
 
     def __init__(self) -> None:
         self.knowledge_base = KNOWLEDGE_BASE
-
-        self.jarvis_bridge_url = os.getenv(
-            "JARVIS_BRIDGE_URL",
-            "ws://localhost:8787",
+        self.client = (
+            AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            if settings.OPENAI_API_KEY
+            else None
         )
 
-        self.jarvis_timeout = float(
-            os.getenv(
-                "JARVIS_BRIDGE_TIMEOUT",
-                "60",
-            )
-        )
-
-    # -----------------------------------------------------------------------
     # Context formatting
     # -----------------------------------------------------------------------
 
@@ -317,163 +307,6 @@ class AITutor:
         return "\n".join(lines)
 
     # -----------------------------------------------------------------------
-    # Jarvis AI
-    # -----------------------------------------------------------------------
-
-    def _ask_jarvis_sync(
-        self,
-        question: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """
-        Send a tutor request to the Jarvis WebSocket bridge.
-
-        Expected request:
-
-            {
-                "type": "ask",
-                "id": "...",
-                "text": "..."
-            }
-
-        Expected completion message:
-
-            {
-                "type": "done",
-                "text": "..."
-            }
-        """
-
-        request_id = str(uuid.uuid4())
-
-        context_text = self._context_text(
-            context
-        )
-
-        prompt = f"""
-You are the AI Tutor inside Q-Loop.
-
-Q-Loop is an interactive platform for learning quantum algorithms.
-
-Your job is to teach quantum algorithms clearly and accurately.
-
-Important rules:
-- Explain quantum algorithms rather than focusing only on quantum hardware.
-- Prefer beginner-friendly explanations.
-- Adapt the explanation to the learner level when supplied.
-- Explain quantum gates step by step when relevant.
-- Use the supplied Q-Loop circuit context when it is relevant.
-- Use actual simulation results when they are supplied.
-- Never invent simulation results.
-- If a simulation result is provided, use its actual values.
-- If the learner asks for an explanation, teach rather than merely giving a definition.
-- Use simple examples where useful.
-- Keep mathematical notation readable.
-- Do not claim that you personally executed a simulation.
-- The Q-Loop simulator is responsible for actual circuit execution.
-
-Learner question:
-{question}
-
-Q-Loop context:
-{context_text}
-""".strip()
-
-        payload = {
-            "type": "ask",
-            "id": request_id,
-            "text": prompt,
-        }
-
-        ws = None
-
-        try:
-            ws = websocket.create_connection(
-    self.jarvis_bridge_url,
-    timeout=self.jarvis_timeout,
-    origin="http://localhost:5173",
-)
-
-            ws.send(
-                json.dumps(payload)
-            )
-
-            while True:
-                raw_message = ws.recv()
-
-                if not raw_message:
-                    continue
-
-                try:
-                    message = json.loads(
-                        raw_message
-                    )
-                except json.JSONDecodeError:
-                    continue
-
-                message_type = message.get(
-                    "type"
-                )
-
-                # -------------------------------------------------------
-                # Final Jarvis answer
-                # -------------------------------------------------------
-
-                if message_type == "done":
-                    response_text = message.get(
-                        "text"
-                    )
-
-                    if response_text:
-                        return str(
-                            response_text
-                        )
-
-                    return None
-
-                # -------------------------------------------------------
-                # Jarvis-side error
-                # -------------------------------------------------------
-
-                if message_type == "error":
-                    return None
-
-                # -------------------------------------------------------
-                # Ignore progress/intermediate messages.
-                # Continue waiting for "done".
-                # -------------------------------------------------------
-
-        except Exception as exc:
-            print(
-                "Jarvis bridge request failed: "
-                f"{exc}"
-            )
-            return None
-
-        finally:
-            if ws is not None:
-                try:
-                    ws.close()
-                except Exception:
-                    pass
-
-    async def _ask_jarvis(
-        self,
-        question: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """
-        Run the blocking WebSocket client without blocking
-        the FastAPI event loop.
-        """
-
-        return await asyncio.to_thread(
-            self._ask_jarvis_sync,
-            question,
-            context,
-        )
-
-    # -----------------------------------------------------------------------
     # Decide whether the agent should use a tool
     # -----------------------------------------------------------------------
 
@@ -497,9 +330,7 @@ Q-Loop context:
             if not analysis:
                 return None
 
-            if analysis.get(
-                "action"
-            ) != "tool_required":
+            if analysis.get("type") != "tool_required":
                 return None
 
             tool_name = analysis.get(
@@ -1040,68 +871,32 @@ Q-Loop context:
         )
 
     # -----------------------------------------------------------------------
-    # Main explain function
+    # Main GPT-4o-mini + RAG tutor
     # -----------------------------------------------------------------------
 
-    def explain(
+    async def explain(
         self,
         question: str,
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """
-        Main tutor entry point.
-
-        Returns:
-            response
-            suggestions
-            code_example
-            confidence
-            sources
-        """
-
-        question = (
-            question or ""
-        ).strip()
+        question = (question or "").strip()
+        context = context or {}
 
         if not question:
             return {
-                "response": (
-                    "Please ask me a quantum-algorithm question "
-                    "or ask me to analyze your current circuit."
-                ),
-                "suggestions": [
-                    "Explain this circuit",
-                    "What is superposition?",
-                    "What does the Hadamard gate do?",
-                ],
+                "response": "Please ask a quantum-computing or quantum-algorithm question.",
+                "suggestions": ["Explain superposition", "Explain Grover's algorithm", "What does the Hadamard gate do?"],
                 "code_example": None,
                 "confidence": "high",
-                "sources": [
-                    "Q-Loop AI Tutor"
-                ],
+                "sources": ["Q-Loop AI Tutor"],
             }
 
-        # -------------------------------------------------------------------
-        # 1. Ask QLoopAgent whether simulation is required
-        # -------------------------------------------------------------------
-
-        simulation_result = (
-            self._run_agent_if_needed(
-                question,
-                context,
-            )
-        )
-
+        # Preserve the simulator as a deterministic Q-Loop tool. GPT does not
+        # invent circuit execution results.
+        simulation_result = self._run_agent_if_needed(question, context)
         if simulation_result:
-            response = (
-                self._build_simulation_explanation(
-                    simulation_result,
-                    context,
-                )
-            )
-
             return {
-                "response": response,
+                "response": self._build_simulation_explanation(simulation_result, context),
                 "suggestions": [
                     "Explain the gates step by step",
                     "Why are these measurement results obtained?",
@@ -1109,57 +904,85 @@ Q-Loop context:
                 ],
                 "code_example": None,
                 "confidence": "high",
-                "sources": [
-                    "Q-Loop Simulator",
-                    "QLoopAgent",
-                ],
+                "sources": ["Q-Loop Simulator"],
             }
 
-        # -------------------------------------------------------------------
-        # 2. Ask Jarvis
-        # -------------------------------------------------------------------
+        retrieved = []
+        if self.client:
+            try:
+                retrieved = await retrieve_relevant_chunks(question)
+            except Exception as exc:
+                print(f"[rag] Retrieval failed: {exc}")
 
-        try:
-            jarvis_response = asyncio.run(
-                self._ask_jarvis(
-                    question,
-                    context,
+            context_text = self._context_text(context)
+            source_blocks = []
+            source_labels = []
+            for index, item in enumerate(retrieved, start=1):
+                location = " · ".join(
+                    str(value) for value in (
+                        item.get("chapter"),
+                        item.get("section"),
+                        f"page {item.get('page')}" if item.get("page") else None,
+                    ) if value
                 )
+                label = str(item.get("source_name") or "Q-Loop knowledge base")
+                if location:
+                    label += f" · {location}"
+                source_labels.append(label)
+                source_blocks.append(f"[{index}] {label}\n{item.get('content', '')}")
+
+            knowledge_context = (
+                "\n\n".join(source_blocks)
+                if source_blocks
+                else "No matching indexed source was found for this question."
             )
-        except Exception as exc:
-            print(
-                "Jarvis tutor error: "
-                f"{exc}"
+
+            system_prompt = (
+                "You are Q-Loop's quantum computing and quantum algorithm tutor. "
+                "Teach clearly in beginner-friendly English, using correct mathematics and examples. "
+                "Use the retrieved Q-Loop sources as the primary authority. "
+                "When a claim comes from a retrieved source, cite it using its bracket number, such as [1]. "
+                "Never invent a book title, page number, module, section, or source. "
+                "If the retrieved sources do not contain the answer, say so clearly and distinguish any "
+                "general background knowledge from Q-Loop course material. "
+                "Use the learner and circuit context only when relevant. Never claim to have run a circuit; "
+                "the Q-Loop simulator is the only source of actual simulation results."
             )
-            jarvis_response = None
+            user_prompt = (
+                f"Question:\n{question}\n\n"
+                f"Learner and circuit context:\n{context_text}\n\n"
+                f"Retrieved knowledge:\n{knowledge_context}\n\n"
+                "Answer with a clear explanation, steps or an example when useful."
+            )
 
-        if jarvis_response:
-            return {
-                "response": jarvis_response,
-                "suggestions": [
-                    "Explain it more simply",
-                    "Give me an example",
-                    "Show the circuit idea",
-                ],
-                "code_example": None,
-                "confidence": "high",
-                "sources": [
-                    "Jarvis",
-                    "Q-Loop AI Tutor",
-                ],
-            }
-
-        # -------------------------------------------------------------------
-        # 3. Local Q-Loop fallback
-        # -------------------------------------------------------------------
-
-        response = self._fallback_explanation(
-            question,
-            context,
-        )
+            try:
+                completion = await self.client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.2,
+                    max_tokens=1100,
+                )
+                answer = (completion.choices[0].message.content or "").strip()
+                if answer:
+                    return {
+                        "response": answer,
+                        "suggestions": [
+                            "Explain it more simply",
+                            "Give me a worked example",
+                            "Show how this relates to a quantum circuit",
+                        ],
+                        "code_example": None,
+                        "confidence": "high" if retrieved else "medium",
+                        "sources": list(dict.fromkeys(source_labels)) or ["GPT-4o-mini general knowledge"],
+                    }
+            except Exception as exc:
+                print(f"[ai] GPT-4o-mini request failed: {exc}")
 
         return {
-            "response": response,
+            "response": self._fallback_explanation(question, context),
             "suggestions": [
                 "Explain this with an example",
                 "Show me a quantum circuit",
@@ -1167,14 +990,35 @@ Q-Loop context:
             ],
             "code_example": None,
             "confidence": "medium",
-            "sources": [
-                "Q-Loop AI Tutor",
-                "Local Knowledge Base",
-            ],
+            "sources": ["Q-Loop local knowledge base"],
         }
 
+    async def hint(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return await self.explain(
+            "Give me one helpful hint without revealing the complete solution. " + question,
+            context,
+        )
 
-# ---------------------------------------------------------------------------
+    async def debug(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return await self.explain(
+            "Help me debug this quantum circuit or code issue. Identify likely cause and safe next checks. " + question,
+            context,
+        )
+
+    async def optimize(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return await self.explain(
+            "Suggest valid improvements for this quantum circuit or code. Explain trade-offs and do not claim unverified execution. " + question,
+            context,
+        )
+
+    async def generate_code(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        result = await self.explain(
+            "Provide a small, correct quantum programming example, preferably Qiskit unless another framework is requested. " + question,
+            context,
+        )
+        return result
+
+
 # Global tutor instance
 # ---------------------------------------------------------------------------
 
