@@ -1,7 +1,7 @@
 """Add pgvector-backed knowledge chunks for RAG.
 
 Revision ID: 0003_rag_documents
-Revises: 0002_chat_history
+Revises: 0002
 """
 from alembic import op
 import sqlalchemy as sa
