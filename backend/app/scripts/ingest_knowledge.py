@@ -3,6 +3,7 @@
 Run from backend/: python -m app.scripts.ingest_knowledge
 """
 import asyncio
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -195,42 +196,43 @@ async def main() -> None:
     if not expanded:
         raise RuntimeError("No knowledge sources found to index.")
 
+    insert_sql = text("""
+        INSERT INTO rag_documents
+            (content, source_type, source_name, module_id, chapter, section, page, metadata, embedding)
+        VALUES
+            (:content, :source_type, :source_name, :module_id, :chapter, :section, :page,
+             CAST(:metadata AS jsonb), CAST(:embedding AS vector))
+    """)
+
+    # Build all embeddings before replacing the current index. If an OpenAI
+    # request fails, the previously working index remains available.
+    prepared_rows = []
+    total = len(expanded)
+    for start in range(0, total, 64):
+        batch = expanded[start:start + 64]
+        response = await client.embeddings.create(
+            model=settings.OPENAI_EMBEDDING_MODEL,
+            input=[item["text"] for item in batch],
+        )
+        for item, vector_item in zip(batch, response.data):
+            vector = "[" + ",".join(str(value) for value in vector_item.embedding) + "]"
+            prepared_rows.append({
+                "content": item["text"],
+                "source_type": item["source_type"],
+                "source_name": item["source_name"],
+                "module_id": item.get("module_id"),
+                "chapter": item.get("chapter"),
+                "section": item.get("section"),
+                "page": item.get("page"),
+                "metadata": json.dumps(item.get("metadata", {})),
+                "embedding": vector,
+            })
+        print(f"[ingest] Prepared {len(prepared_rows)}/{total} chunks")
+
     async with AsyncSessionLocal() as session:
-        await session.execute(text("DELETE FROM rag_documents"))
-        await session.commit()
-
-        insert_sql = text("""
-            INSERT INTO rag_documents
-                (content, source_type, source_name, module_id, chapter, section, page, metadata, embedding)
-            VALUES
-                (:content, :source_type, :source_name, :module_id, :chapter, :section, :page,
-                 CAST(:metadata AS jsonb), CAST(:embedding AS vector))
-        """)
-
-        total = len(expanded)
-        for start in range(0, total, 64):
-            batch = expanded[start:start + 64]
-            response = await client.embeddings.create(
-                model=settings.OPENAI_EMBEDDING_MODEL,
-                input=[item["text"] for item in batch],
-            )
-            params = []
-            for item, vector_item in zip(batch, response.data):
-                vector = "[" + ",".join(str(value) for value in vector_item.embedding) + "]"
-                params.append({
-                    "content": item["text"],
-                    "source_type": item["source_type"],
-                    "source_name": item["source_name"],
-                    "module_id": item.get("module_id"),
-                    "chapter": item.get("chapter"),
-                    "section": item.get("section"),
-                    "page": item.get("page"),
-                    "metadata": __import__("json").dumps(item.get("metadata", {})),
-                    "embedding": vector,
-                })
-            await session.execute(insert_sql, params)
-            await session.commit()
-            print(f"[ingest] Indexed {min(start + len(batch), total)}/{total} chunks")
+        async with session.begin():
+            await session.execute(text("DELETE FROM rag_documents"))
+            await session.execute(insert_sql, prepared_rows)
 
     print(f"[ingest] Completed. Indexed {total} knowledge chunks.")
 
