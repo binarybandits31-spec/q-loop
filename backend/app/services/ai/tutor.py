@@ -976,7 +976,7 @@ class AITutor:
                         ],
                         "code_example": None,
                         "confidence": "high" if retrieved else "medium",
-                        "sources": list(dict.fromkeys(source_labels)) or ["GPT-4o-mini general knowledge"],
+                        "sources": source_labels or ["GPT-4o-mini general knowledge"],
                     }
             except Exception as exc:
                 print(f"[ai] GPT-4o-mini request failed: {exc}")
