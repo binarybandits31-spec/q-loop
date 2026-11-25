@@ -8,6 +8,7 @@ Q-Loop's own QLoopAgent remains responsible for circuit simulation.
 """
 
 from typing import Any, Dict, Optional
+import re
 
 from openai import AsyncOpenAI
 
@@ -1013,9 +1014,12 @@ class AITutor:
 
     async def generate_code(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         result = await self.explain(
-            "Provide a small, correct quantum programming example, preferably Qiskit unless another framework is requested. " + question,
+            "Provide a small, correct quantum programming example, preferably Qiskit unless another framework is requested. Include the code in a fenced Python code block. " + question,
             context,
         )
+        match = re.search(r"```(?:python)?\s*([\s\S]*?)```", result.get("response", ""))
+        if match:
+            result["code_example"] = match.group(1).strip()
         return result
 
 
