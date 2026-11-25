@@ -4,7 +4,6 @@ Revision ID: 0003_rag_documents
 Revises: 0002
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = "0003_rag_documents"
 down_revision = "0002"
