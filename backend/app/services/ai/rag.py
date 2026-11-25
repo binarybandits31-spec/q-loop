@@ -26,6 +26,7 @@ async def retrieve_relevant_chunks(question: str, limit: int | None = None) -> l
         SELECT content, source_type, source_name, module_id, chapter, section, page,
                1 - (embedding <=> CAST(:embedding AS vector)) AS similarity
         FROM rag_documents
+        WHERE 1 - (embedding <=> CAST(:embedding AS vector)) >= :min_similarity
         ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
     """)
@@ -34,7 +35,7 @@ async def retrieve_relevant_chunks(question: str, limit: int | None = None) -> l
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 query,
-                {"embedding": vector_literal, "limit": limit or settings.RAG_TOP_K},
+                {"embedding": vector_literal, "limit": limit or settings.RAG_TOP_K, "min_similarity": settings.RAG_MIN_SIMILARITY},
             )
             return [dict(row) for row in result.mappings().all()]
     except SQLAlchemyError as exc:
