@@ -32,4 +32,4 @@ numpy==1.26.4
 pennylane-lightning==0.38.0
 autoray==0.7.2
 qbraid==0.12.2
-websocket-client==1.8.0
+websocket-client==1.8.0pypdf==5.1.0\n
