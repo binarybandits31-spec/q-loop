@@ -14,7 +14,7 @@ async def ai_explain(body: AIRequest, user: User | None = Depends(get_current_us
     ctx = body.context.model_dump() if body.context else {}
     if user:
         ctx["learner_level"] = user.learning_level
-    result = tutor.explain(body.question or "", ctx)
+    result = await tutor.explain(body.question or "", ctx)
     return AIResponse(action="explain", **result)
 
 
@@ -24,7 +24,7 @@ async def ai_hint(body: AIRequest, user: User | None = Depends(get_current_user_
     ctx = body.context.model_dump() if body.context else {}
     if user:
         ctx["learner_level"] = user.learning_level
-    result = tutor.hint(body.question or "", ctx)
+    result = await tutor.hint(body.question or "", ctx)
     return AIResponse(action="hint", **result)
 
 
@@ -34,7 +34,7 @@ async def ai_debug(body: AIRequest, user: User | None = Depends(get_current_user
     ctx = body.context.model_dump() if body.context else {}
     if user:
         ctx["learner_level"] = user.learning_level
-    result = tutor.debug(body.question or "", ctx)
+    result = await tutor.debug(body.question or "", ctx)
     return AIResponse(action="debug", **result)
 
 
@@ -42,7 +42,7 @@ async def ai_debug(body: AIRequest, user: User | None = Depends(get_current_user
 async def ai_optimize(body: AIRequest, user: User | None = Depends(get_current_user_optional)):
     """Suggest circuit or code optimizations."""
     ctx = body.context.model_dump() if body.context else {}
-    result = tutor.optimize(body.question or "", ctx)
+    result = await tutor.optimize(body.question or "", ctx)
     return AIResponse(action="optimize", **result)
 
 
@@ -50,5 +50,5 @@ async def ai_optimize(body: AIRequest, user: User | None = Depends(get_current_u
 async def ai_generate_code(body: AIRequest, user: User | None = Depends(get_current_user_optional)):
     """Generate example quantum code for a given topic."""
     ctx = body.context.model_dump() if body.context else {}
-    result = tutor.generate_code(body.question or "", ctx)
+    result = await tutor.generate_code(body.question or "", ctx)
     return AIResponse(action="generate_code", **result)

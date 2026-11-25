@@ -28,6 +28,7 @@ interface Message {
   content: string
   timestamp: number
   code?: string
+  sources?: string[]
 }
 
 interface Conversation {
@@ -424,6 +425,7 @@ if (!response.ok) {
           data.response ||
           'I generated a response, but no explanation was returned.',
         code: data.code_example || undefined,
+        sources: Array.isArray(data.sources) ? data.sources : [],
         timestamp: Date.now(),
       }
 
@@ -624,6 +626,21 @@ if (!response.ok) {
                         <div>
                           {formatContent(message.content)}
                         </div>
+
+                        {message.sources && message.sources.length > 0 && (
+                          <div className="border-t border-cyan-500/10 pt-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                              Sources
+                            </p>
+                            <ul className="space-y-1 text-xs text-slate-400">
+                              {message.sources.map((source, index) => (
+                                <li key={`${message.id}-source-${index}`}>
+                                  [{index + 1}] {source}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
 
                         {message.code && (
                           <div className="overflow-hidden rounded-lg border border-cyan-500/20 bg-slate-950">

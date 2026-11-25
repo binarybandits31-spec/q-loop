@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     # OpenAI (optional)
     OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    RAG_TOP_K: int = 5
+    RAG_MIN_SIMILARITY: float = 0.25
 
     # App
     ENVIRONMENT: str = "development"
